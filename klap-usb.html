@@ -592,8 +592,9 @@ async function readLoop() {
             // エンドポイント番号は必ずGPSモジュールの仕様書で確認してください！
             const result = await device.transferIn(IN_ENDPOINT, 512); 
             if (result.status === 'ok' && result.data) {
-                const decoder = new TextDecoder('ascii');
-                const nmeaData = decoder.decode(result.data);
+                const decoder = new TextDecoder('iso-8859-1'); 
+const nmeaData = decoder.decode(result.data);
+
                 
                 // --- 💡 修正点: NMEAデータを画面に表示 ---
                 if (nmeaLogElement && nmeaData.length > 0) {
@@ -857,6 +858,7 @@ window.addEventListener('load', () => {
 </body>
 
 </html>
+
 
 
 
