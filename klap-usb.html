@@ -147,7 +147,7 @@
             width: 100%;
             box-sizing: border-box;
             pointer-events: none;
-            opacity: 0.7; /* 視認性を上げるために少し不透明度を調整 */
+            opacity: 0.7;
             text-align: left;
         }
         .status-text {
@@ -156,6 +156,18 @@
         #debug-overlay #debugInfo {
             margin-top: 5px;
             line-height: 1.2;
+        }
+        /* NMEAログ表示エリアのスタイルを追加 */
+        #nmeaLog {
+            height: 100px; 
+            overflow-y: scroll; 
+            border: 1px solid #ccc; 
+            padding: 5px; 
+            font-size: 10px;
+            background-color: #000;
+            white-space: pre-wrap; /* NMEAメッセージが折り返されるように */
+            word-break: break-all;
+            pointer-events: all; /* スクロールできるようにイベントを有効に */
         }
         
         @media (max-width: 480px) {
@@ -198,6 +210,8 @@
     <div id="debug-overlay">
         <p id="status-display" class="status-text">GPS設定: 未取得</p>
         <div id="debugInfo" class="status-text"></div>
+        <p class="status-text">NMEA Raw Data:</p>
+        <pre id="nmeaLog"></pre>
     </div>
     
     <div id="main-content">
@@ -229,7 +243,6 @@ let lapCount = 0;
 let countUpTimerId = null;
 let lapTimerId = null;
 let lapStartTime = 0;
-// let gpsWatchId = null; // Web Geolocation API は使用しない
 let isGpsRunning = false;
 let lastPosition = null;
 let previousSideOfLine = null;
@@ -249,7 +262,9 @@ const elem = {
     resetButton: null,
     lapButton: null,
     gpsButton: null,
-    getSettingsBtn: null
+    getSettingsBtn: null,
+    // 💡 NMEAログ表示要素を追加
+    nmeaLog: null 
 };
 
 // GPSラップ計測用変数 - localStorageから読み込む
@@ -260,15 +275,18 @@ let LAP_LINE_P2 = { lat: 0, lon: 0 };
 let device = null;
 let keepReading = true;
 let nmeaBuffer = '';
-const NMEA_VENDOR_ID = 0x1546;   // ★ 修正が必要 ★ 例: u-blox
-const NMEA_PRODUCT_ID = 0x01A8;  // ★ 修正が必要 ★ 例: u-blox
-const IN_ENDPOINT = 1;           // ★ 修正が必要 ★ USB In エンドポイント番号
+const NMEA_VENDOR_ID = 0x1546;   
+const NMEA_PRODUCT_ID = 0x01A8;  
+// ★ データが流れない場合、まずこの値を '2' に変更してください ★
+const IN_ENDPOINT = 1;           
+// 💡 WebUSBインターフェース番号
+const INTERFACE_NUMBER = 0; 
 
 // --- 更新レート/デバッグ表示用変数 ---
-let lastUpdateTime = 0; 
-let updateCounter = 0; 
-let displayRateTimer = null; 
-let currentUpdateRate = 0; 
+let lastUpdateTime = 0; 
+let updateCounter = 0; 
+let displayRateTimer = null; 
+let currentUpdateRate = 0; 
 let currentLat = 0.0;
 let currentLon = 0.0;
 
@@ -453,7 +471,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数 (ここから大幅に修正)
+// WebUSB/NMEA/更新レート関連の関数 (ログ表示ロジックを追加)
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -474,6 +492,7 @@ function parseNmeaLine(line) {
     const parts = line.split(',');
     
     // $GPRMC/$GNRMC (RMC: Recommended Minimum sentence C) から緯度/経度/速度を抽出
+    // 3番目のフィールドが 'A' (Active) であることを確認
     if ((parts[0].endsWith('RMC') || parts[0].endsWith('RMC')) && parts.length >= 10 && parts[2] === 'A') {
         const lat = dmsToDecimal(parts[3], parts[4]);
         const lon = dmsToDecimal(parts[5], parts[6]);
@@ -507,7 +526,8 @@ function processNmeaData(data) {
         if (line.startsWith('$') && line.length > 5) {
             const position = parseNmeaLine(line);
             
-            if (position) { // 取得できた位置情報であれば、常にデバッグ用変数を更新
+            if (position) {
+                // 取得できた位置情報であれば、常にデバッグ用変数を更新
                 currentLat = position.coords.latitude;
                 currentLon = position.coords.longitude;
             }
@@ -553,9 +573,6 @@ function updateDebugDisplay() {
     // lastPositionがセットされているか確認して速度を表示
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
 
-    // 距離、ライン通過、周回数 (グローバル変数化していないため、正確な表示は難しいが、既存の情報を利用)
-    // 既存の onWebUsbPositionUpdate 内のロジックから必要な値をグローバルに抽出する必要がありますが、
-    // ここではラップカウントのみ利用します。
     const lapCountText = `周回数: ${lapCount}`; 
 
     elem.debugInfo.innerHTML = `
@@ -566,8 +583,10 @@ function updateDebugDisplay() {
     `;
 }
 
-// WebUSBデータ読み取りループ
+// WebUSBデータ読み取りループ (NMEAログ表示ロジックを追加)
 async function readLoop() {
+    const nmeaLogElement = elem.nmeaLog; // NMEAログ表示要素
+    
     while (device && keepReading) {
         try {
             // エンドポイント番号は必ずGPSモジュールの仕様書で確認してください！
@@ -575,6 +594,20 @@ async function readLoop() {
             if (result.status === 'ok' && result.data) {
                 const decoder = new TextDecoder();
                 const nmeaData = decoder.decode(result.data);
+                
+                // --- 💡 修正点: NMEAデータを画面に表示 ---
+                if (nmeaLogElement && nmeaData.length > 0) {
+                    // 最新データを先頭に追加
+                    nmeaLogElement.textContent = nmeaData + nmeaLogElement.textContent;
+                    
+                    // ログが長くなりすぎないように制限
+                    if (nmeaLogElement.textContent.length > 20000) {
+                         // 古いデータをカット
+                         nmeaLogElement.textContent = nmeaLogElement.textContent.substring(0, 10000); 
+                    }
+                }
+                // ------------------------------------
+                
                 processNmeaData(nmeaData); 
             }
         } catch (error) {
@@ -603,8 +636,8 @@ async function startWebUsbGps() {
             await device.selectConfiguration(device.configurations[0].configurationValue);
         }
         
-        const interfaceNumber = 0; // GPSモジュールで利用されるインターフェース番号
-        await device.claimInterface(interfaceNumber);
+        // INTERFACE_NUMBER は WebUSB デバイスの構成によって異なる場合があります
+        await device.claimInterface(INTERFACE_NUMBER);
         
         elem.statusDisplay.textContent = 'GPSモジュール接続完了。データ監視中...';
         elem.gpsButton.classList.remove('no-gps');
@@ -638,8 +671,7 @@ async function stopGps() {
     keepReading = false;
     if (device) {
         try {
-            const interfaceNumber = 0;
-            await device.releaseInterface(interfaceNumber);
+            await device.releaseInterface(INTERFACE_NUMBER);
             await device.close();
         } catch (error) {
             console.error("USB Close Error:", error);
@@ -651,6 +683,9 @@ async function stopGps() {
     elem.gpsButton.textContent = 'GPS';
     elem.gpsButton.classList.remove('active-blue');
     elem.gpsButton.classList.add('no-gps');
+    
+    // NMEAログ表示エリアをクリア
+    if(elem.nmeaLog) elem.nmeaLog.textContent = '';
 }
 
 // onGpsPositionUpdate を onWebUsbPositionUpdate に改名し、WebUSBからのデータを受ける
@@ -777,7 +812,7 @@ function onWebUsbPositionUpdate(position) {
     lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
     previousSideOfLine = currentSideOfLine;
 
-    // リアルタイム表示を更新（ここではレート表示ではない他の情報）
+    // リアルタイム表示を更新
     updateDebugDisplay(); 
 }
 
@@ -804,6 +839,8 @@ window.addEventListener('load', () => {
     elem.lapButton = document.getElementById('lap');
     elem.gpsButton = document.getElementById('gpsButton');
     elem.getSettingsBtn = document.getElementById('getSettingsBtn');
+    // 💡 NMEAログ表示要素を初期化時に取得
+    elem.nmeaLog = document.getElementById('nmeaLog'); 
 
     if (elem.startButton) elem.startButton.addEventListener('click', clickStartSW);
     if (elem.lapButton) elem.lapButton.addEventListener('click', clickLapSW);
