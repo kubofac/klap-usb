@@ -260,8 +260,8 @@ let LAP_LINE_P2 = { lat: 0, lon: 0 };
 let device = null;
 let keepReading = true;
 let nmeaBuffer = '';
-const NMEA_VENDOR_ID = 0x1547;   // ★ 修正が必要 ★ 例: u-blox
-const NMEA_PRODUCT_ID = 0x01A7;  // ★ 修正が必要 ★ 例: u-blox
+const NMEA_VENDOR_ID = 0x1546;   // ★ 修正が必要 ★ 例: u-blox
+const NMEA_PRODUCT_ID = 0x01A8;  // ★ 修正が必要 ★ 例: u-blox
 const IN_ENDPOINT = 1;           // ★ 修正が必要 ★ USB In エンドポイント番号
 
 // --- 更新レート/デバッグ表示用変数 ---
@@ -818,4 +818,5 @@ window.addEventListener('load', () => {
 });
 </script>
 </body>
+
 </html>
