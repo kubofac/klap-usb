@@ -592,7 +592,7 @@ async function readLoop() {
             // エンドポイント番号は必ずGPSモジュールの仕様書で確認してください！
             const result = await device.transferIn(IN_ENDPOINT, 512); 
             if (result.status === 'ok' && result.data) {
-                const decoder = new TextDecoder('iso-8859-1'); 
+               const decoder = new TextDecoder('windows-1252');
 const nmeaData = decoder.decode(result.data);
 
                 
@@ -858,6 +858,7 @@ window.addEventListener('load', () => {
 </body>
 
 </html>
+
 
 
 
