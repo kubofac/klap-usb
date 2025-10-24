@@ -1,652 +1,656 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>K-LAP_ｸﾎﾞﾌｧｸ 設定ツール (WebUSB対応)</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
-    <link rel="manifest" href="/manifest.json">
-    <script>
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
-                    .then(registration => {
-                        console.log('Service Worker registered! Scope:', registration.scope);
-                    })
-                    .catch(err => {
-                        console.log('Service Worker registration failed:', err);
-                    });
-            });
-        }
-    </script>
-    <style>
-        /* CSSは変更なし */
-        #map-cntainer { position: relative; }
-        #mapid { height: 300px; width: 100%; margin-bottom: 15px; }
-        #map-controls {
-            position: absolute; top: 10px; right: 10px; z-index: 1000;
-            background-color: rgba(255, 255, 255, 0.8); padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
-        }
-        #map-controls button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; cursor: pointer; margin-right: 5px; }
-        #map-controls button.active { background-color: #007bff; color: white; }
-        body { font-family: sans-serif; padding: 20px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input[type="number"] { padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; width: 200px; }
-        .form-group select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; width: 200px; }
-        .form-group button { padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; cursor: pointer; margin-right: 5px; }
-        #setSportkk, #setSportkkk, #setThresholdValue, #setLapCoolDown, #gps-frequency { margin-top: 10px; font-weight: bold; }
-        #clickCoordinates { font-weight: bold; }
-        #instructionMessage { font-weight: bold; min-height: 20px; }
-    </style>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>K-LAP_ｸﾎﾞﾌｧｸ 設定ツール (WebUSB対応)</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/service-worker.js')
+                    .then(registration => {
+                        console.log('Service Worker registered! Scope:', registration.scope);
+                    })
+                    .catch(err => {
+                        console.log('Service Worker registration failed:', err);
+                    });
+            });
+        }
+    </script>
+    <style>
+        /* CSSは変更なし */
+        #map-cntainer { position: relative; }
+        #mapid { height: 300px; width: 100%; margin-bottom: 15px; }
+        #map-controls {
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            background-color: rgba(255, 255, 255, 0.8); padding: 10px; border-radius: 5px; box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+        }
+        #map-controls button { padding: 8px 12px; border: 1px solid #ccc; border-radius: 5px; font-size: 14px; cursor: pointer; margin-right: 5px; }
+        #map-controls button.active { background-color: #007bff; color: white; }
+        body { font-family: sans-serif; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input[type="number"] { padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; width: 200px; }
+        .form-group select { padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; width: 200px; }
+        .form-group button { padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 16px; cursor: pointer; margin-right: 5px; }
+        #setSportkk, #setSportkkk, #setThresholdValue, #setLapCoolDown, #gps-frequency { margin-top: 10px; font-weight: bold; }
+        #clickCoordinates { font-weight: bold; }
+        #instructionMessage { font-weight: bold; min-height: 20px; }
+    </style>
 </head>
 <body>
 
-    <div class="form-group">
-        <label for="circuitSelect">サーキットを選択:</label>
-        <select name="cir" id="circuitSelect">
-            <option value="">サーキットを選択</option>
-            <option value="0">白糸S</option>
-            <option value="1">富士C</option>
-            <option value="2">つま恋</option>
-            <option value="3">中井C</option>
-        </select>
-        <p id="setSportkk"></p>
-    </div>
+    <div class="form-group">
+        <label for="circuitSelect">サーキットを選択:</label>
+        <select name="cir" id="circuitSelect">
+            <option value="">サーキットを選択</option>
+            <option value="0">白糸S</option>
+            <option value="1">富士C</option>
+            <option value="2">つま恋</option>
+            <option value="3">中井C</option>
+        </select>
+        <p id="setSportkk"></p>
+    </div>
 
-    <div id="map-container">
-        <div id="mapid"></div>
-        <div id="map-controls">
-            <button id="setStartPointButton">開始点を配置</button>
-            <button id="setEndPointButton" disabled>終了点を配置</button>
-        </div>
-    </div>
-    
-    <div class="form-group">
-        <p id="instructionMessage"></p>
-    </div>
+    <div id="map-container">
+        <div id="mapid"></div>
+        <div id="map-controls">
+            <button id="setStartPointButton">開始点を配置</button>
+            <button id="setEndPointButton" disabled>終了点を配置</button>
+        </div>
+    </div>
+    
+    <div class="form-group">
+        <p id="instructionMessage"></p>
+    </div>
 
-    <div class="form-group">
-        <label for="startLineP1Lon">開始点 経度:</label>
-        <input type="number" id="startLineP1Lon" placeholder="経度" readonly>
-    </div>
-    <div class="form-group">
-        <label for="startLineP1Lat">開始点 緯度:</label>
-        <input type="number" id="startLineP1Lat" placeholder="緯度" readonly>
-    </div>
-    <div class="form-group">
-        <label for="startLineP2Lon">終了点 経度:</label>
-        <input type="number" id="startLineP2Lon" placeholder="経度" readonly>
-    </div>
-    <div class="form-group">
-        <label for="startLineP2Lat">終了点 緯度:</label>
-        <input type="number" id="startLineP2Lat" placeholder="緯度" readonly>
-    </div>
+    <div class="form-group">
+        <label for="startLineP1Lon">開始点 経度:</label>
+        <input type="number" id="startLineP1Lon" placeholder="経度" readonly>
+    </div>
+    <div class="form-group">
+        <label for="startLineP1Lat">開始点 緯度:</label>
+        <input type="number" id="startLineP1Lat" placeholder="緯度" readonly>
+    </div>
+    <div class="form-group">
+        <label for="startLineP2Lon">終了点 経度:</label>
+        <input type="number" id="startLineP2Lon" placeholder="経度" readonly>
+    </div>
+    <div class="form-group">
+        <label for="startLineP2Lat">終了点 緯度:</label>
+        <input type="number" id="startLineP2Lat" placeholder="緯度" readonly>
+    </div>
 
-    <div class="form-group">
-        <button onclick="saveStartLineCoordinates()">スタートライン座標を保存</button>
-    </div>
+    <div class="form-group">
+        <button onclick="saveStartLineCoordinates()">スタートライン座標を保存</button>
+    </div>
 
-    <div class="form-group">
-        <p>GPS更新頻度: <span id="gps-frequency">未接続</span> Hz</p>
-    </div>
-    
-    <div class="form-group">
-        <label for="thresholdSelect">GPS閾値 (メートル):</label>
-        <select name="threshold" id="thresholdSelect">
-            <option value="10">10m</option>
-            <option value="15">15m</option>
-            <option value="20">20m</option>
-            <option value="25">25m</option>
-            <option value="30">30m</option>
-            <option value="40">40m</option>
-        </select>
-        <p id="setThresholdValue"></p>
-    </div>
+    <div class="form-group">
+        <p>GPS更新頻度: <span id="gps-frequency">未接続</span> Hz</p>
+    </div>
+    
+    <div class="form-group">
+        <label for="thresholdSelect">GPS閾値 (メートル):</label>
+        <select name="threshold" id="thresholdSelect">
+            <option value="10">10m</option>
+            <option value="15">15m</option>
+            <option value="20">20m</option>
+            <option value="25">25m</option>
+            <option value="30">30m</option>
+            <option value="40">40m</option>
+        </select>
+        <p id="setThresholdValue"></p>
+    </div>
 
-    <div class="form-group">
-        <button onclick="saveThreshold()">SET GPS閾値</button>
-    </div>
+    <div class="form-group">
+        <button onclick="saveThreshold()">SET GPS閾値</button>
+    </div>
 
-    <div class="form-group">
-        <label for="lapCoolDownSelect">ラップクールダウン (秒):</label>
-        <select name="coolDown" id="lapCoolDownSelect">
-            <option value="20000">20秒</option>
-            <option value="30000">30秒</option>
-            <option value="40000">40秒</option>
-            <option value="50000">50秒</option>
-            <option value="60000">60秒</option>
-            <option value="90000">90秒</option>
-            <option value="122000">120秒</option>
-            <option value="180000">180秒</option>
-        </select>
-        <p id="setLapCoolDown"></p>
-    </div>
+    <div class="form-group">
+        <label for="lapCoolDownSelect">ラップクールダウン (秒):</label>
+        <select name="coolDown" id="lapCoolDownSelect">
+            <option value="20000">20秒</option>
+            <option value="30000">30秒</option>
+            <option value="40000">40秒</option>
+            <option value="50000">50秒</option>
+            <option value="60000">60秒</option>
+            <option value="90000">90秒</option>
+            <option value="122000">120秒</option>
+            <option value="180000">180秒</option>
+        </select>
+        <p id="setLapCoolDown"></p>
+    </div>
 
-    <div class="form-group">
-        <button onclick="saveLapCoolDown()">SET ラップクールダウン</button>
-    </div>
+    <div class="form-group">
+        <button onclick="saveLapCoolDown()">SET ラップクールダウン</button>
+    </div>
 
-    <div class="form-group">
-        <button id="webUsbGpsConnectButton">WebUSB GPS接続</button>
-        <button value="START" id="mybtn2" style="margin-left: 10px;">ラップタイマーへ</button>
-    </div>
+    <div class="form-group">
+        <button id="webUsbGpsConnectButton">WebUSB GPS接続</button>
+        <button value="START" id="mybtn2" style="margin-left: 10px;">ラップタイマーへ</button>
+    </div>
 
-    <div class="form-group">
-        <p id="clickCoordinates">GPSモジュールを接続してください。</p>
-    </div>
+    <div class="form-group">
+        <p id="clickCoordinates">GPSモジュールを接続してください。</p>
+    </div>
 
-    <div class="form-group">
-        <button id="resetStorageButton">Reset All Settings</button>
-    </div>
+    <div class="form-group">
+        <button id="resetStorageButton">Reset All Settings</button>
+    </div>
 
-    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
-    <script src="circuit_data.js"></script> 
-    
-    <script>
-        // =========================================================================
-        // WebUSB グローバル変数と設定
-        // =========================================================================
-        let device = null;
-        let keepReading = true;
-        let nmeaBuffer = '';
-        
-        // ★★★ 以前のやり取りで特定したGPSモジュール情報 ★★★
-        const NMEA_VENDOR_ID = 0x1546;   
-        const NMEA_PRODUCT_ID = 0x01A8;  
-        const IN_ENDPOINT = 1;           
-        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="circuit_data.js"></script> 
+    
+    <script>
+        // =========================================================================
+        // WebUSB グローバル変数と設定
+        // =========================================================================
+        let device = null;
+        let keepReading = true;
+        let nmeaBuffer = '';
+        
+        // ★★★ 以前のやり取りで特定したGPSモジュール情報 ★★★
+        const NMEA_VENDOR_ID = 0x1546;   
+        const NMEA_PRODUCT_ID = 0x01A8;  
+        const IN_ENDPOINT = 1;           
+        // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
 
-        let webUsbWatchId = null; // WebUSB監視フラグ (接続状態の管理用)
-        let updateCounter = 0; 
-        let displayRateTimer = null; 
-        let lastPosition = null; 
+        let webUsbWatchId = null; // WebUSB監視フラグ (接続状態の管理用)
+        let updateCounter = 0; 
+        let displayRateTimer = null; 
+        let lastPosition = null; 
 
-        // =========================================================================
-        // Leaflet/設定 グローバル変数 (変更なし)
-        // =========================================================================
-        var map;
-        var startPointMarker = null;
-        var endPointMarker = null;
-        var currentPositionMarker = null;
-        var startLinePolyline = null;
-        var pl1 = 1; 
-        var cir1 = "";
-        var gpsThreshold = 20;
-        var lapCoolDownTime = 30000;
-        
-        // =========================================================================
-        // NMEA 解析関数 (sw.html と同じロジック)
-        // =========================================================================
-        function dmsToDecimal(dmm, direction) {
-            if (!dmm || dmm.length < 3) return NaN;
-            const degrees = parseInt(dmm.substring(0, dmm.indexOf('.') - 2));
-            const minutes = parseFloat(dmm.substring(dmm.indexOf('.') - 2));
-            let decimal = degrees + (minutes / 60);
+        // =========================================================================
+        // Leaflet/設定 グローバル変数 (変更なし)
+        // =========================================================================
+        var map;
+        var startPointMarker = null;
+        var endPointMarker = null;
+        var currentPositionMarker = null;
+        var startLinePolyline = null;
+        var pl1 = 1; 
+        var cir1 = "";
+        var gpsThreshold = 20;
+        var lapCoolDownTime = 30000;
+        
+        // =========================================================================
+        // NMEA 解析関数 (sw.html と同じロジック)
+        // =========================================================================
+        function dmsToDecimal(dmm, direction) {
+            if (!dmm || dmm.length < 3) return NaN;
+            const degrees = parseInt(dmm.substring(0, dmm.indexOf('.') - 2));
+            const minutes = parseFloat(dmm.substring(dmm.indexOf('.') - 2));
+            let decimal = degrees + (minutes / 60);
 
-            if (direction === 'S' || direction === 'W') {
-                decimal = -decimal;
-            }
-            return decimal;
-        }
+            if (direction === 'S' || direction === 'W') {
+                decimal = -decimal;
+            }
+            return decimal;
+        }
 
-        function parseNmeaLine(line) {
-            const parts = line.split(',');
-            // $GPRMC/$GNRMC の 'A' (Valid) ステータスを確認
-            if ((parts[0].endsWith('RMC') || parts[0].endsWith('RMC')) && parts.length >= 10 && parts[2] === 'A') {
-                const lat = dmsToDecimal(parts[3], parts[4]);
-                const lon = dmsToDecimal(parts[5], parts[6]);
-                const speedKnot = parseFloat(parts[7]) || 0;
-                const speedMps = speedKnot * 0.514444; 
+        function parseNmeaLine(line) {
+            const parts = line.split(',');
+            // $GPRMC/$GNRMC の 'A' (Valid) ステータスを確認
+            if ((parts[0].endsWith('RMC') || parts[0].endsWith('RMC')) && parts.length >= 10 && parts[2] === 'A') {
+                const lat = dmsToDecimal(parts[3], parts[4]);
+                const lon = dmsToDecimal(parts[5], parts[6]);
+                const speedKnot = parseFloat(parts[7]) || 0;
+                const speedMps = speedKnot * 0.514444; 
 
-                if (isNaN(lat) || isNaN(lon)) return null;
+                if (isNaN(lat) || isNaN(lon)) return null;
 
-                return {
-                    coords: {
-                        latitude: lat,
-                        longitude: lon,
-                        speed: speedMps, 
-                        accuracy: 1
-                    },
-                    timestamp: Date.now() 
-                };
-            }
-            return null;
-        }
+                return {
+                    coords: {
+                        latitude: lat,
+                        longitude: lon,
+                        speed: speedMps, 
+                        accuracy: 1
+                    },
+                    timestamp: Date.now() 
+                };
+            }
+            return null;
+        }
 
-        function processNmeaData(data) {
-            nmeaBuffer += data;
-            let newlineIndex;
+        function processNmeaData(data) {
+            nmeaBuffer += data;
+            let newlineIndex;
 
-            while ((newlineIndex = nmeaBuffer.indexOf('\n')) !== -1) {
-                const line = nmeaBuffer.substring(0, newlineIndex).trim();
-                nmeaBuffer = nmeaBuffer.substring(newlineIndex + 1);
+            while ((newlineIndex = nmeaBuffer.indexOf('\n')) !== -1) {
+                const line = nmeaBuffer.substring(0, newlineIndex).trim();
+                nmeaBuffer = nmeaBuffer.substring(newlineIndex + 1);
 
-                if (line.startsWith('$') && line.length > 5) {
-                    const position = parseNmeaLine(line);
-                    if (position) {
-                        onWebUsbPositionUpdate(position); 
-                    }
-                }
-            }
-        }
+                if (line.startsWith('$') && line.length > 5) {
+                    const position = parseNmeaLine(line);
+                    if (position) {
+                        onWebUsbPositionUpdate(position); 
+                    }
+                }
+            }
+        }
 
-        // =========================================================================
-        // WebUSB 接続・監視・更新関数
-        // =========================================================================
-        
-        // WebUSBデータ読み取りループ
-        async function readLoop() {
-            while (device && keepReading) {
-                try {
-                    const result = await device.transferIn(IN_ENDPOINT, 512); 
-                    if (result.status === 'ok' && result.data) {
-                        const decoder = new TextDecoder();
-                        const nmeaData = decoder.decode(result.data);
-                        processNmeaData(nmeaData); 
-                    }
-                } catch (error) {
-                    if (keepReading) {
-                        console.error("Read Loop Error:", error);
-                        document.getElementById('clickCoordinates').textContent = `エラー: USB通信断。再接続してください。`;
-                    }
-                    break; 
-                }
-            }
-            stopGpsFrequencyMonitor();
-        }
+        // =========================================================================
+        // WebUSB 接続・監視・更新関数
+        // =========================================================================
+        
+        // WebUSBデータ読み取りループ
+        async function readLoop() {
+            while (device && keepReading) {
+                try {
+                    const result = await device.transferIn(IN_ENDPOINT, 512); 
+                    if (result.status === 'ok' && result.data) {
+                        const decoder = new TextDecoder();
+                        const nmeaData = decoder.decode(result.data);
+                        processNmeaData(nmeaData); 
+                    }
+                } catch (error) {
+                    if (keepReading) {
+                        console.error("Read Loop Error:", error);
+                        document.getElementById('clickCoordinates').textContent = `エラー: USB通信断。再接続してください。`;
+                    }
+                    break; 
+                }
+            }
+            stopGpsFrequencyMonitor();
+        }
 
-        // WebUSB接続を開始
-        async function startWebUsbGps() {
-            try {
-                document.getElementById('clickCoordinates').textContent = 'USBデバイスを検索中...';
-                
-                device = await navigator.usb.requestDevice({
-                    filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }]
-                });
-                
-                await device.open();
-                
-                if (device.configuration === null) {
-                    await device.selectConfiguration(device.configurations[0].configurationValue);
-                }
-                
-                const interfaceNumber = 0; 
-                await device.claimInterface(interfaceNumber);
-                
-                webUsbWatchId = true;
-                keepReading = true;
-                document.getElementById('webUsbGpsConnectButton').textContent = 'GPS 切断';
-                document.getElementById('clickCoordinates').textContent = 'GPSモジュール接続完了。データ受信中...';
-                
-                startRateMeasurement(); 
-                readLoop(); 
-                
-            } catch (error) {
-                console.error("WebUSB Error:", error);
-                document.getElementById('clickCoordinates').textContent = `接続エラー: ${error.message}`;
-                document.getElementById('webUsbGpsConnectButton').textContent = 'WebUSB GPS接続';
-                stopGpsFrequencyMonitor();
-            }
-        }
+        // WebUSB接続を開始
+        async function startWebUsbGps() {
+            try {
+                document.getElementById('clickCoordinates').textContent = 'USBデバイスを検索中...';
+                
+                device = await navigator.usb.requestDevice({
+                    filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }]
+                });
+                
+                await device.open();
+                
+                if (device.configuration === null) {
+                    await device.selectConfiguration(device.configurations[0].configurationValue);
+                }
+                
+                // --- 💡 修正箇所: インターフェース番号を 0 から 1 に変更 ---
+                const interfaceNumber = 1; 
+                await device.claimInterface(interfaceNumber);
+                // ----------------------------------------------------
+                
+                webUsbWatchId = true;
+                keepReading = true;
+                document.getElementById('webUsbGpsConnectButton').textContent = 'GPS 切断';
+                document.getElementById('clickCoordinates').textContent = 'GPSモジュール接続完了。データ受信中...';
+                
+                startRateMeasurement(); 
+                readLoop(); 
+                
+            } catch (error) {
+                console.error("WebUSB Error:", error);
+                document.getElementById('clickCoordinates').textContent = `接続エラー: ${error.message}`;
+                document.getElementById('webUsbGpsConnectButton').textContent = 'WebUSB GPS接続';
+                stopGpsFrequencyMonitor();
+            }
+        }
 
-        // GPS更新レート計測開始
-        function startRateMeasurement() {
-            if (displayRateTimer !== null) {
-                clearInterval(displayRateTimer);
-            }
-            updateCounter = 0;
-            
-            displayRateTimer = setInterval(() => {
-                const frequency = updateCounter; 
-                document.getElementById('gps-frequency').textContent = frequency.toFixed(1);
-                updateCounter = 0; 
-            }, 1000); 
-        }
+        // GPS更新レート計測開始
+        function startRateMeasurement() {
+            if (displayRateTimer !== null) {
+                clearInterval(displayRateTimer);
+            }
+            updateCounter = 0;
+            
+            displayRateTimer = setInterval(() => {
+                const frequency = updateCounter; 
+                document.getElementById('gps-frequency').textContent = frequency.toFixed(1);
+                updateCounter = 0; 
+            }, 1000); 
+        }
 
-        // GPS監視を停止
-        async function stopGpsFrequencyMonitor() {
-            if (displayRateTimer !== null) {
-                clearInterval(displayRateTimer);
-                displayRateTimer = null;
-            }
-            document.getElementById('gps-frequency').textContent = '未接続';
+        // GPS監視を停止
+        async function stopGpsFrequencyMonitor() {
+            if (displayRateTimer !== null) {
+                clearInterval(displayRateTimer);
+                displayRateTimer = null;
+            }
+            document.getElementById('gps-frequency').textContent = '未接続';
 
-            keepReading = false;
-            if (device) {
-                try {
-                    await device.releaseInterface(0);
-                    await device.close();
-                } catch (error) {
-                    console.error("USB Close Error:", error);
-                }
-                device = null;
-            }
-            webUsbWatchId = null;
-            document.getElementById('webUsbGpsConnectButton').textContent = 'WebUSB GPS接続';
-            console.log('WebUSB GPS監視を停止しました。');
-        }
+            keepReading = false;
+            if (device) {
+                try {
+                    // --- 💡 修正箇所に合わせてインターフェース番号を 1 に変更 ---
+                    await device.releaseInterface(1); 
+                    // ----------------------------------------------------
+                    await device.close();
+                } catch (error) {
+                    console.error("USB Close Error:", error);
+                }
+                device = null;
+            }
+            webUsbWatchId = null;
+            document.getElementById('webUsbGpsConnectButton').textContent = 'WebUSB GPS接続';
+            console.log('WebUSB GPS監視を停止しました。');
+        }
 
-        // NMEAデータ受信時の処理 (地図上の現在地マーカー更新と頻度計測)
-        function onWebUsbPositionUpdate(position) {
-            updateCounter++;
+        // NMEAデータ受信時の処理 (地図上の現在地マーカー更新と頻度計測)
+        function onWebUsbPositionUpdate(position) {
+            updateCounter++;
 
-            const currentLat = position.coords.latitude;
-            const currentLon = position.coords.longitude;
-            const currentLatLng = L.latLng(currentLat, currentLon);
-            
-            // 地図上の現在地マーカーを更新
-            if (currentPositionMarker) {
-                currentPositionMarker.setLatLng(currentLatLng);
-            } else {
-                currentPositionMarker = L.circleMarker(currentLatLng, {
-                    radius: 5, 
-                    color: 'blue',
-                    fillColor: '#007aff',
-                    fillOpacity: 0.8
-                }).addTo(map);
-                map.setView(currentLatLng, 18);
-            }
-            
-            // 現在地座標を表示
-            document.getElementById('clickCoordinates').textContent = 
-                `現在地: 緯度 ${currentLat.toFixed(6)}, 経度 ${currentLon.toFixed(6)}`;
+            const currentLat = position.coords.latitude;
+            const currentLon = position.coords.longitude;
+            const currentLatLng = L.latLng(currentLat, currentLon);
+            
+            // 地図上の現在地マーカーを更新
+            if (currentPositionMarker) {
+                currentPositionMarker.setLatLng(currentLatLng);
+            } else {
+                currentPositionMarker = L.circleMarker(currentLatLng, {
+                    radius: 5, 
+                    color: 'blue',
+                    fillColor: '#007aff',
+                    fillOpacity: 0.8
+                }).addTo(map);
+                map.setView(currentLatLng, 18);
+            }
+            
+            // 現在地座標を表示
+            document.getElementById('clickCoordinates').textContent = 
+                `現在地: 緯度 ${currentLat.toFixed(6)}, 経度 ${currentLon.toFixed(6)}`;
 
-            lastPosition = position;
-        }
+            lastPosition = position;
+        }
 
-        // =========================================================================
-        // Leaflet/UI 関数 (WebUSBに合わせて修正)
-        // =========================================================================
+        // =========================================================================
+        // Leaflet/UI 関数 (WebUSBに合わせて修正)
+        // =========================================================================
 
-        function initMap() {
-            map = L.map('mapid');
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
+        function initMap() {
+            map = L.map('mapid');
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
 
-            // 初期位置を日本中心付近に設定 (WebUSB接続後に現在地へ移動)
-            map.setView([35.6812, 139.7671], 8); 
-        }
+            // 初期位置を日本中心付近に設定 (WebUSB接続後に現在地へ移動)
+            map.setView([35.6812, 139.7671], 8); 
+        }
 
-        // (onMarkerDragEnd, updateStartLinePolyline, saveStartLineCoordinates, 
-        //  saveThreshold, saveLapCoolDown, loadStored...関数は変更なし)
+        // (onMarkerDragEnd, updateStartLinePolyline, saveStartLineCoordinates, 
+        //  saveThreshold, saveLapCoolDown, loadStored...関数は変更なし)
 
-        // マーカーのドラッグイベントハンドラ
-        function onMarkerDragEnd(e) {
-            const marker = e.target;
-            const latlng = marker.getLatLng();
+        // マーカーのドラッグイベントハンドラ
+        function onMarkerDragEnd(e) {
+            const marker = e.target;
+            const latlng = marker.getLatLng();
 
-            if (marker === startPointMarker) {
-                document.getElementById('startLineP1Lon').value = latlng.lng;
-                document.getElementById('startLineP1Lat').value = latlng.lat;
-                marker.setPopupContent('開始点<br>緯度: ' + latlng.lat.toFixed(6) + '<br>経度: ' + latlng.lng.toFixed(6)).openPopup();
-                console.log('開始点をドラッグして更新しました:', latlng);
-            } else if (marker === endPointMarker) {
-                document.getElementById('startLineP2Lon').value = latlng.lng;
-                document.getElementById('startLineP2Lat').value = latlng.lat;
-                marker.setPopupContent('終了点<br>緯度: ' + latlng.lat.toFixed(6) + '<br>経度: ' + latlng.lng.toFixed(6)).openPopup();
-                console.log('終了点をドラッグして更新しました:', latlng);
-            }
-            updateStartLinePolyline();
-        }
+            if (marker === startPointMarker) {
+                document.getElementById('startLineP1Lon').value = latlng.lng;
+                document.getElementById('startLineP1Lat').value = latlng.lat;
+                marker.setPopupContent('開始点<br>緯度: ' + latlng.lat.toFixed(6) + '<br>経度: ' + latlng.lng.toFixed(6)).openPopup();
+                console.log('開始点をドラッグして更新しました:', latlng);
+            } else if (marker === endPointMarker) {
+                document.getElementById('startLineP2Lon').value = latlng.lng;
+                document.getElementById('startLineP2Lat').value = latlng.lat;
+                marker.setPopupContent('終了点<br>緯度: ' + latlng.lat.toFixed(6) + '<br>経度: ' + latlng.lng.toFixed(6)).openPopup();
+                console.log('終了点をドラッグして更新しました:', latlng);
+            }
+            updateStartLinePolyline();
+        }
 
-        // スタートラインの線を更新する関数
-        function updateStartLinePolyline() {
-            if (startLinePolyline) {
-                map.removeLayer(startLinePolyline);
-            }
-            if (startPointMarker && endPointMarker) {
-                const p1 = startPointMarker.getLatLng();
-                const p2 = endPointMarker.getLatLng();
-                startLinePolyline = L.polyline([p1, p2], { color: 'red', weight: 5, opacity: 0.7 }).addTo(map);
-            }
-        }
-        
-        // 既存の loadCircuitStartLineFromData, saveStartLineCoordinates, 
-        // saveThreshold, saveLapCoolDown, resetStorageAndDisplay 関数は省略
-        // ... (省略された関数群は、元のコードからそのまま使用できます) ...
-        
-        function saveStartLineCoordinates() {
-            const p1Lon = parseFloat(document.getElementById('startLineP1Lon').value);
-            const p1Lat = parseFloat(document.getElementById('startLineP1Lat').value);
-            const p2Lon = parseFloat(document.getElementById('startLineP2Lon').value);
-            const p2Lat = parseFloat(document.getElementById('startLineP2Lat').value);
+        // スタートラインの線を更新する関数
+        function updateStartLinePolyline() {
+            if (startLinePolyline) {
+                map.removeLayer(startLinePolyline);
+            }
+            if (startPointMarker && endPointMarker) {
+                const p1 = startPointMarker.getLatLng();
+                const p2 = endPointMarker.getLatLng();
+                startLinePolyline = L.polyline([p1, p2], { color: 'red', weight: 5, opacity: 0.7 }).addTo(map);
+            }
+        }
+        
+        // 既存の loadCircuitStartLineFromData, saveStartLineCoordinates, 
+        // saveThreshold, saveLapCoolDown, resetStorageAndDisplay 関数は省略
+        // ... (省略された関数群は、元のコードからそのまま使用できます) ...
+        
+        function saveStartLineCoordinates() {
+            const p1Lon = parseFloat(document.getElementById('startLineP1Lon').value);
+            const p1Lat = parseFloat(document.getElementById('startLineP1Lat').value);
+            const p2Lon = parseFloat(document.getElementById('startLineP2Lon').value);
+            const p2Lat = parseFloat(document.getElementById('startLineP2Lat').value);
 
-            if (!isNaN(p1Lon) && !isNaN(p1Lat) && !isNaN(p2Lon) && !isNaN(p2Lat)) {
-                localStorage.setItem('startLineP1Lon', p1Lon);
-                localStorage.setItem('startLineP1Lat', p1Lat);
-                localStorage.setItem('startLineP2Lon', p2Lon);
-                localStorage.setItem('startLineP2Lat', p2Lat);
-                document.getElementById('instructionMessage').textContent = 'スタートライン座標を保存しました。';
-                loadStoredStartLineCoordinates();
-            } else {
-                document.getElementById('instructionMessage').textContent = '正しい数値を入力してください。';
-            }
-        }
+            if (!isNaN(p1Lon) && !isNaN(p1Lat) && !isNaN(p2Lon) && !isNaN(p2Lat)) {
+                localStorage.setItem('startLineP1Lon', p1Lon);
+                localStorage.setItem('startLineP1Lat', p1Lat);
+                localStorage.setItem('startLineP2Lon', p2Lon);
+                localStorage.setItem('startLineP2Lat', p2Lat);
+                document.getElementById('instructionMessage').textContent = 'スタートライン座標を保存しました。';
+                loadStoredStartLineCoordinates();
+            } else {
+                document.getElementById('instructionMessage').textContent = '正しい数値を入力してください。';
+            }
+        }
 
-        function saveThreshold() {
-            localStorage.setItem('gpsThreshold', gpsThreshold);
-            document.getElementById('instructionMessage').textContent = 'GPS閾値を保存しました: ' + gpsThreshold + "m";
-        }
+        function saveThreshold() {
+            localStorage.setItem('gpsThreshold', gpsThreshold);
+            document.getElementById('instructionMessage').textContent = 'GPS閾値を保存しました: ' + gpsThreshold + "m";
+        }
 
-        function saveLapCoolDown() {
-            localStorage.setItem('lapCoolDownTime', lapCoolDownTime);
-            document.getElementById('instructionMessage').textContent = 'ラップクールダウンを保存しました: ' + (lapCoolDownTime / 1000) + "秒";
-        }
-        
-        // localStorageからのロード関数
-        function loadStoredStartLineCoordinates() {
-            const slP1Lon = localStorage.getItem('startLineP1Lon');
-            const slP1Lat = localStorage.getItem('startLineP1Lat');
-            const slP2Lon = localStorage.getItem('startLineP2Lon');
-            const slP2Lat = localStorage.getItem('startLineP2Lat');
+        function saveLapCoolDown() {
+            localStorage.setItem('lapCoolDownTime', lapCoolDownTime);
+            document.getElementById('instructionMessage').textContent = 'ラップクールダウンを保存しました: ' + (lapCoolDownTime / 1000) + "秒";
+        }
+        
+        // localStorageからのロード関数
+        function loadStoredStartLineCoordinates() {
+            const slP1Lon = localStorage.getItem('startLineP1Lon');
+            const slP1Lat = localStorage.getItem('startLineP1Lat');
+            const slP2Lon = localStorage.getItem('startLineP2Lon');
+            const slP2Lat = localStorage.getItem('startLineP2Lat');
 
-            document.getElementById('startLineP1Lon').value = slP1Lon || '';
-            document.getElementById('startLineP1Lat').value = slP1Lat || '';
-            document.getElementById('startLineP2Lon').value = slP2Lon || '';
-            document.getElementById('startLineP2Lat').value = slP2Lat || '';
+            document.getElementById('startLineP1Lon').value = slP1Lon || '';
+            document.getElementById('startLineP1Lat').value = slP1Lat || '';
+            document.getElementById('startLineP2Lon').value = slP2Lon || '';
+            document.getElementById('startLineP2Lat').value = slP2Lat || '';
 
-            if (slP1Lon && slP1Lat && slP2Lon && slP2Lat) {
-                const p1 = L.latLng(parseFloat(slP1Lat), parseFloat(slP1Lon));
-                const p2 = L.latLng(parseFloat(slP2Lat), parseFloat(slP2Lon));
-                document.getElementById('setEndPointButton').disabled = false;
+            if (slP1Lon && slP1Lat && slP2Lon && slP2Lat) {
+                const p1 = L.latLng(parseFloat(slP1Lat), parseFloat(slP1Lon));
+                const p2 = L.latLng(parseFloat(slP2Lat), parseFloat(slP2Lon));
+                document.getElementById('setEndPointButton').disabled = false;
 
-                if (startPointMarker) map.removeLayer(startPointMarker);
-                if (endPointMarker) map.removeLayer(endPointMarker);
+                if (startPointMarker) map.removeLayer(startPointMarker);
+                if (endPointMarker) map.removeLayer(endPointMarker);
 
-                startPointMarker = L.marker(p1, { draggable: true }).addTo(map)
-                    .bindPopup('保存された開始点<br>緯度: ' + p1.lat.toFixed(6) + '<br>経度: ' + p1.lng.toFixed(6))
-                    .openPopup();
-                startPointMarker.on('dragend', onMarkerDragEnd);
+                startPointMarker = L.marker(p1, { draggable: true }).addTo(map)
+                    .bindPopup('保存された開始点<br>緯度: ' + p1.lat.toFixed(6) + '<br>経度: ' + p1.lng.toFixed(6))
+                    .openPopup();
+                startPointMarker.on('dragend', onMarkerDragEnd);
 
-                endPointMarker = L.marker(p2, { draggable: true }).addTo(map)
-                    .bindPopup('保存された終了点<br>緯度: ' + p2.lat.toFixed(6) + '<br>経度: ' + p2.lng.toFixed(6))
-                    .openPopup();
-                endPointMarker.on('dragend', onMarkerDragEnd);
+                endPointMarker = L.marker(p2, { draggable: true }).addTo(map)
+                    .bindPopup('保存された終了点<br>緯度: ' + p2.lat.toFixed(6) + '<br>経度: ' + p2.lng.toFixed(6))
+                    .openPopup();
+                endPointMarker.on('dragend', onMarkerDragEnd);
 
-                updateStartLinePolyline();
-                console.log('保存されたスタートライン座標を読み込みました:', p1, p2);
-            } else {
-                document.getElementById('setEndPointButton').disabled = true;
-                if (startPointMarker) map.removeLayer(startPointMarker);
-                if (endPointMarker) map.removeLayer(endPointMarker);
-                if (startLinePolyline) map.removeLayer(startLinePolyline);
-                startPointMarker = null; endPointMarker = null; startLinePolyline = null;
-                console.log('localStorageにスタートライン座標は保存されていません。');
-            }
-        }
-        
-        function loadStoredThreshold() {
-            const storedThreshold = localStorage.getItem('gpsThreshold');
-            if (storedThreshold) {
-                gpsThreshold = Number(storedThreshold);
-                document.getElementById("thresholdSelect").value = storedThreshold;
-                document.getElementById("setThresholdValue").textContent = gpsThreshold + "m";
-            } else {
-                gpsThreshold = 20;
-                document.getElementById("thresholdSelect").value = 20;
-                document.getElementById("setThresholdValue").textContent = gpsThreshold + "m";
-            }
-        }
+                updateStartLinePolyline();
+                console.log('保存されたスタートライン座標を読み込みました:', p1, p2);
+            } else {
+                document.getElementById('setEndPointButton').disabled = true;
+                if (startPointMarker) map.removeLayer(startPointMarker);
+                if (endPointMarker) map.removeLayer(endPointMarker);
+                if (startLinePolyline) map.removeLayer(startLinePolyline);
+                startPointMarker = null; endPointMarker = null; startLinePolyline = null;
+                console.log('localStorageにスタートライン座標は保存されていません。');
+            }
+        }
+        
+        function loadStoredThreshold() {
+            const storedThreshold = localStorage.getItem('gpsThreshold');
+            if (storedThreshold) {
+                gpsThreshold = Number(storedThreshold);
+                document.getElementById("thresholdSelect").value = storedThreshold;
+                document.getElementById("setThresholdValue").textContent = gpsThreshold + "m";
+            } else {
+                gpsThreshold = 20;
+                document.getElementById("thresholdSelect").value = 20;
+                document.getElementById("setThresholdValue").textContent = gpsThreshold + "m";
+            }
+        }
 
-        function loadStoredLapCoolDown() {
-            const storedLapCoolDown = localStorage.getItem('lapCoolDownTime');
-            if (storedLapCoolDown) {
-                lapCoolDownTime = Number(storedLapCoolDown);
-                document.getElementById("lapCoolDownSelect").value = storedLapCoolDown;
-                document.getElementById("setLapCoolDown").textContent = (lapCoolDownTime / 1000) + "秒";
-            } else {
-                lapCoolDownTime = 30000;
-                document.getElementById("lapCoolDownSelect").value = 30000;
-                document.getElementById("setLapCoolDown").textContent = (lapCoolDownTime / 1000) + "秒";
-            }
-        }
+        function loadStoredLapCoolDown() {
+            const storedLapCoolDown = localStorage.getItem('lapCoolDownTime');
+            if (storedLapCoolDown) {
+                lapCoolDownTime = Number(storedLapCoolDown);
+                document.getElementById("lapCoolDownSelect").value = storedLapCoolDown;
+                document.getElementById("setLapCoolDown").textContent = (lapCoolDownTime / 1000) + "秒";
+            } else {
+                lapCoolDownTime = 30000;
+                document.getElementById("lapCoolDownSelect").value = 30000;
+                document.getElementById("setLapCoolDown").textContent = (lapCoolDownTime / 1000) + "秒";
+            }
+        }
 
-        function loadStoredCircuit() {
-            const storedCircuit = localStorage.getItem('cir1');
-            const circuitSelectElement = document.getElementById("circuitSelect");
-            if (storedCircuit) {
-                cir1 = storedCircuit;
-                const optionToSelect = Array.from(circuitSelectElement.options).find(option => option.text === storedCircuit);
-                if (optionToSelect) {
-                    circuitSelectElement.value = optionToSelect.value;
-                    document.getElementById("setSportkk").textContent = cir1;
-                    document.getElementById('setEndPointButton').disabled = false;
-                } else {
-                    circuitSelectElement.value = "";
-                    document.getElementById("setSportkk").textContent = "未選択";
-                }
-            } else {
-                circuitSelectElement.value = "";
-                document.getElementById("setSportkk").textContent = "未選択";
-            }
-        }
+        function loadStoredCircuit() {
+            const storedCircuit = localStorage.getItem('cir1');
+            const circuitSelectElement = document.getElementById("circuitSelect");
+            if (storedCircuit) {
+                cir1 = storedCircuit;
+                const optionToSelect = Array.from(circuitSelectElement.options).find(option => option.text === storedCircuit);
+                if (optionToSelect) {
+                    circuitSelectElement.value = optionToSelect.value;
+                    document.getElementById("setSportkk").textContent = cir1;
+                    document.getElementById('setEndPointButton').disabled = false;
+                } else {
+                    circuitSelectElement.value = "";
+                    document.getElementById("setSportkk").textContent = "未選択";
+                }
+            } else {
+                circuitSelectElement.value = "";
+                document.getElementById("setSportkk").textContent = "未選択";
+            }
+        }
 
-        function loadCircuitStartLineFromData(circuitId) {
-            if (typeof circuitData !== 'undefined' && circuitData && circuitData[circuitId]) {
-                return {
-                    p1: circuitData[circuitId].startLineP1,
-                    p2: circuitData[circuitId].startLineP2
-                };
-            } else {
-                return { p1: [0, 0], p2: [0, 0] };
-            }
-        }
-        
-        // Function to reset all stored data and update UI
-        function resetStorageAndDisplay() {
-            if (confirm('すべての保存された設定をリセットしてもよろしいですか？')) {
-                localStorage.removeItem('startLineP1Lon');
-                localStorage.removeItem('startLineP1Lat');
-                localStorage.removeItem('startLineP2Lon');
-                localStorage.removeItem('startLineP2Lat');
-                localStorage.removeItem('pl1'); // pl1の保存/ロードが省略されているため、一応残す
-                localStorage.removeItem('cir1');
-                localStorage.removeItem('gpsThreshold');
-                localStorage.removeItem('lapCoolDownTime');
+        function loadCircuitStartLineFromData(circuitId) {
+            if (typeof circuitData !== 'undefined' && circuitData && circuitData[circuitId]) {
+                return {
+                    p1: circuitData[circuitId].startLineP1,
+                    p2: circuitData[circuitId].startLineP2
+                };
+            } else {
+                return { p1: [0, 0], p2: [0, 0] };
+            }
+        }
+        
+        // Function to reset all stored data and update UI
+        function resetStorageAndDisplay() {
+            if (confirm('すべての保存された設定をリセットしてもよろしいですか？')) {
+                localStorage.removeItem('startLineP1Lon');
+                localStorage.removeItem('startLineP1Lat');
+                localStorage.removeItem('startLineP2Lon');
+                localStorage.removeItem('startLineP2Lat');
+                localStorage.removeItem('pl1'); // pl1の保存/ロードが省略されているため、一応残す
+                localStorage.removeItem('cir1');
+                localStorage.removeItem('gpsThreshold');
+                localStorage.removeItem('lapCoolDownTime');
 
-                document.getElementById('startLineP1Lon').value = '';
-                document.getElementById('startLineP1Lat').value = '';
-                document.getElementById('startLineP2Lon').value = '';
-                document.getElementById('startLineP2Lat').value = '';
+                document.getElementById('startLineP1Lon').value = '';
+                document.getElementById('startLineP1Lat').value = '';
+                document.getElementById('startLineP2Lon').value = '';
+                document.getElementById('startLineP2Lat').value = '';
 
-                document.getElementById("circuitSelect").value = "";
-                document.getElementById("setSportkk").textContent = "未選択";
-                document.getElementById("thresholdSelect").value = "20";
-                document.getElementById("setThresholdValue").textContent = "20m";
-                document.getElementById("lapCoolDownSelect").value = "30000";
-                document.getElementById("setLapCoolDown").textContent = "30秒";
-                document.getElementById('clickCoordinates').textContent = 'GPSモジュールを接続してください。';
-                document.getElementById('instructionMessage').textContent = 'すべての設定がリセットされました。';
-                document.getElementById('setEndPointButton').disabled = true;
+                document.getElementById("circuitSelect").value = "";
+                document.getElementById("setSportkk").textContent = "未選択";
+                document.getElementById("thresholdSelect").value = "20";
+                document.getElementById("setThresholdValue").textContent = "20m";
+                document.getElementById("lapCoolDownSelect").value = "30000";
+                document.getElementById("setLapCoolDown").textContent = "30秒";
+                document.getElementById('clickCoordinates').textContent = 'GPSモジュールを接続してください。';
+                document.getElementById('instructionMessage').textContent = 'すべての設定がリセットされました。';
+                document.getElementById('setEndPointButton').disabled = true;
 
-                if (startPointMarker) map.removeLayer(startPointMarker);
-                if (endPointMarker) map.removeLayer(endPointMarker);
-                if (startLinePolyline) map.removeLayer(startLinePolyline);
-                startPointMarker = null; endPointMarker = null; startLinePolyline = null;
-                console.log('All stored data has been reset.');
-            }
-        }
-        
-        // =========================================================================
-        // イベントリスナーのセットアップ
-        // =========================================================================
+                if (startPointMarker) map.removeLayer(startPointMarker);
+                if (endPointMarker) map.removeLayer(endPointMarker);
+                if (startLinePolyline) map.removeLayer(startLinePolyline);
+                startPointMarker = null; endPointMarker = null; startLinePolyline = null;
+                console.log('All stored data has been reset.');
+            }
+        }
+        
+        // =========================================================================
+        // イベントリスナーのセットアップ
+        // =========================================================================
 
-        const circuitSelect = document.getElementById("circuitSelect");
-        circuitSelect.addEventListener("change", function (e) {
-            const stg = circuitSelect.value;
-            const startLine = loadCircuitStartLineFromData(stg);
-            document.getElementById('startLineP1Lon').value = startLine.p1[0];
-            document.getElementById('startLineP1Lat').value = startLine.p1[1];
-            document.getElementById('startLineP2Lon').value = startLine.p2[0];
-            document.getElementById('startLineP2Lat').value = startLine.p2[1];
-            cir1 = (typeof circuitData !== 'undefined' && circuitData[stg]?.name) || "";
-            document.getElementById("setSportkk").textContent = cir1 || "未選択";
-            document.getElementById('setEndPointButton').disabled = false;
-            localStorage.setItem('cir1', cir1);
+        const circuitSelect = document.getElementById("circuitSelect");
+        circuitSelect.addEventListener("change", function (e) {
+            const stg = circuitSelect.value;
+            const startLine = loadCircuitStartLineFromData(stg);
+            document.getElementById('startLineP1Lon').value = startLine.p1[0];
+            document.getElementById('startLineP1Lat').value = startLine.p1[1];
+            document.getElementById('startLineP2Lon').value = startLine.p2[0];
+            document.getElementById('startLineP2Lat').value = startLine.p2[1];
+            cir1 = (typeof circuitData !== 'undefined' && circuitData[stg]?.name) || "";
+            document.getElementById("setSportkk").textContent = cir1 || "未選択";
+            document.getElementById('setEndPointButton').disabled = false;
+            localStorage.setItem('cir1', cir1);
 
-            const p1 = L.latLng(startLine.p1[1], startLine.p1[0]);
-            const p2 = L.latLng(startLine.p2[1], startLine.p2[0]);
-            
-            if (startPointMarker) map.removeLayer(startPointMarker);
-            if (endPointMarker) map.removeLayer(endPointMarker);
+            const p1 = L.latLng(startLine.p1[1], startLine.p1[0]);
+            const p2 = L.latLng(startLine.p2[1], startLine.p2[0]);
+            
+            if (startPointMarker) map.removeLayer(startPointMarker);
+            if (endPointMarker) map.removeLayer(endPointMarker);
 
-            startPointMarker = L.marker(p1, { draggable: true }).addTo(map)
-                .bindPopup('開始点<br>緯度: ' + p1.lat.toFixed(6) + '<br>経度: ' + p1.lng.toFixed(6))
-                .openPopup();
-            startPointMarker.on('dragend', onMarkerDragEnd);
+            startPointMarker = L.marker(p1, { draggable: true }).addTo(map)
+                .bindPopup('開始点<br>緯度: ' + p1.lat.toFixed(6) + '<br>経度: ' + p1.lng.toFixed(6))
+                .openPopup();
+            startPointMarker.on('dragend', onMarkerDragEnd);
 
-            endPointMarker = L.marker(p2, { draggable: true }).addTo(map)
-                .bindPopup('終了点<br>緯度: ' + p2.lat.toFixed(6) + '<br>経度: ' + p2.lng.toFixed(6))
-                .openPopup();
-            endPointMarker.on('dragend', onMarkerDragEnd);
+            endPointMarker = L.marker(p2, { draggable: true }).addTo(map)
+                .bindPopup('終了点<br>緯度: ' + p2.lat.toFixed(6) + '<br>経度: ' + p2.lng.toFixed(6))
+                .openPopup();
+            endPointMarker.on('dragend', onMarkerDragEnd);
 
-            updateStartLinePolyline();
-            map.fitBounds(L.latLngBounds(p1, p2).pad(0.5));
-        });
+            updateStartLinePolyline();
+            map.fitBounds(L.latLngBounds(p1, p2).pad(0.5));
+        });
 
-        const thresholdSelect = document.getElementById("thresholdSelect");
-        thresholdSelect.addEventListener("change", function (e) {
-            gpsThreshold = Number(thresholdSelect.value);
-            document.getElementById("setThresholdValue").textContent = gpsThreshold + "m";
-            localStorage.setItem('gpsThreshold', gpsThreshold);
-        });
+        const thresholdSelect = document.getElementById("thresholdSelect");
+        thresholdSelect.addEventListener("change", function (e) {
+            gpsThreshold = Number(thresholdSelect.value);
+            document.getElementById("setThresholdValue").textContent = gpsThreshold + "m";
+            localStorage.setItem('gpsThreshold', gpsThreshold);
+        });
 
-        const lapCoolDownSelect = document.getElementById("lapCoolDownSelect");
-        lapCoolDownSelect.addEventListener("change", function (e) {
-            lapCoolDownTime = Number(lapCoolDownSelect.value);
-            document.getElementById("setLapCoolDown").textContent = (lapCoolDownTime / 1000) + "秒";
-            localStorage.setItem('lapCoolDownTime', lapCoolDownTime);
-        });
+        const lapCoolDownSelect = document.getElementById("lapCoolDownSelect");
+        lapCoolDownSelect.addEventListener("change", function (e) {
+            lapCoolDownTime = Number(lapCoolDownSelect.value);
+            document.getElementById("setLapCoolDown").textContent = (lapCoolDownTime / 1000) + "秒";
+            localStorage.setItem('lapCoolDownTime', lapCoolDownTime);
+        });
 
-        let button2 = document.getElementById('mybtn2');
-        button2.addEventListener('click', () => {
-            open('klap-usb.html'); // ラップタイマーページへ移動
-        });
-        
-        document.getElementById('resetStorageButton').addEventListener('click', resetStorageAndDisplay);
+        let button2 = document.getElementById('mybtn2');
+        button2.addEventListener('click', () => {
+            open('klap-usb.html'); // ラップタイマーページへ移動
+        });
+        
+        document.getElementById('resetStorageButton').addEventListener('click', resetStorageAndDisplay);
 
-        // ページ読み込み時の処理
-        window.onload = function () {
-            initMap();
-            loadStoredStartLineCoordinates();
-            // loadStoredPulseCount(); は HTML に要素がないためスキップ
-            loadStoredCircuit();
-            loadStoredThreshold();
-            loadStoredLapCoolDown();
-            
-            // WebUSB接続ボタンのイベントリスナー
-            document.getElementById('webUsbGpsConnectButton').addEventListener('click', function() {
-                if (!webUsbWatchId) {
-                    startWebUsbGps(); // WebUSB接続を開始
-                } else {
-                    stopGpsFrequencyMonitor(); // WebUSB接続を切断
-                }
-            });
-        };
-    </script>
+        // ページ読み込み時の処理
+        window.onload = function () {
+            initMap();
+            loadStoredStartLineCoordinates();
+            // loadStoredPulseCount(); は HTML に要素がないためスキップ
+            loadStoredCircuit();
+            loadStoredThreshold();
+            loadStoredLapCoolDown();
+            
+            // WebUSB接続ボタンのイベントリスナー
+            document.getElementById('webUsbGpsConnectButton').addEventListener('click', function() {
+                if (!webUsbWatchId) {
+                    startWebUsbGps(); // WebUSB接続を開始
+                } else {
+                    stopGpsFrequencyMonitor(); // WebUSB接続を切断
+                }
+            });
+        };
+    </script>
 </body>
 
 </html>
