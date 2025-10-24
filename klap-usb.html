@@ -286,11 +286,16 @@ const INTERFACE_NUMBER = 1;
 
 // --- 更新レート/デバッグ表示用変数 ---
 let lastUpdateTime = 0; 
-let updateCounter = 0; 
-let displayRateTimer = null; 
+let updateCounter = 0;  // 💡 レート計測からは外すが、定義は残す
+let displayRateTimer = null;  // 💡 使用しないが、互換性のため残す
 let currentUpdateRate = 0; 
 let currentLat = 0.0;
 let currentLon = 0.0;
+
+// 💡 追加: 移動平均レート計算用変数
+const RATE_HISTORY_SIZE = 5; 
+let updateIntervalHistory = []; 
+let lastRateCalculationTime = 0; 
 
 
 // --- ストップウォッチ関連の関数（変更なし） ---
@@ -473,7 +478,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数 (ログ表示ロジックを修正)
+// WebUSB/NMEA/更新レート関連の関数
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -550,46 +555,14 @@ function processNmeaData(data) {
     }
 }
 
-// 1秒ごとに更新レートを計算して表示するタイマーを開始
-function startRateMeasurement() {
-    // 既存のタイマーがあれば停止し、NULLに戻す
-    if (displayRateTimer !== null) {
-        clearInterval(displayRateTimer);
-        displayRateTimer = null; // 💡 修正点: タイマーIDを確実にリセット
-    }
-    
-    // 変数を初期化
-    currentUpdateRate = 0;
-    updateCounter = 0;
-    
-    // 1秒ごとに実行する新しいタイマーを設定
-    displayRateTimer = setInterval(() => {
-        // 1秒間にカウントされた回数をレートとして取得
-        currentUpdateRate = updateCounter; 
-        
-        // カウンターをリセットして次の1秒の計測に備える
-        updateCounter = 0; 
-        
-        // デバッグ表示を更新 (ここでレートが画面に反映される)
-        updateDebugDisplay(); 
-        
-    }, 1000); 
-}
-
-// 更新レートの計測を停止
-function stopRateMeasurement() {
-    if (displayRateTimer !== null) {
-        clearInterval(displayRateTimer);
-        displayRateTimer = null; // 💡 停止時もIDをリセット
-    }
-    currentUpdateRate = 0;
-}
+// 💡 レート計測タイマー関連関数は削除し、以下のupdateDebugDisplayのみ残す
 
 // デバッグ表示を更新する関数
 function updateDebugDisplay() {
     if (!elem.debugInfo) return;
 
-    const rateText = `レート: ${currentUpdateRate.toFixed(0)} Hz`;
+    // レート計算はonWebUsbPositionUpdate内で完了済み
+    const rateText = `レート: ${currentUpdateRate.toFixed(1)} Hz`;
     const latLonText = `緯度: ${currentLat.toFixed(6)} / 経度: ${currentLon.toFixed(6)}`;
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
 
@@ -611,20 +584,16 @@ async function readLoop() {
         try {
             const result = await device.transferIn(IN_ENDPOINT, 512); 
             if (result.status === 'ok' && result.data) {
-                // 💡 文字化け対策として Latin-1 エンコーディングを指定
                 const decoder = new TextDecoder('iso-8859-1');
                 const nmeaData = decoder.decode(result.data);
                 
-                // --- 💡 NMEAログの最新1行のみ表示 ---
                 if (nmeaLogElement && nmeaData.length > 0) {
                     const lines = nmeaData.trim().split('\n');
                     if (lines.length > 0) {
-                        // 最新の行で表示を上書き
                         const latestLine = lines[lines.length - 1].trim(); 
                         nmeaLogElement.textContent = latestLine; 
                     }
                 }
-                // ------------------------------------
                 
                 processNmeaData(nmeaData); 
             }
@@ -661,8 +630,7 @@ async function startWebUsbGps() {
         isGpsRunning = true;
         keepReading = true;
         
-        // 💡 レート計測タイマーを起動
-        startRateMeasurement(); 
+        // 💡 レート計測タイマー（setInterval）は削除し、readLoopのみを起動
         readLoop(); 
         
     } catch (error) {
@@ -672,20 +640,13 @@ async function startWebUsbGps() {
     }
 }
 
-// GPS監視を開始する
-function startGps() {
-    if (!isSettingsLoaded) {
-        elem.debugInfo.innerHTML = "GPS設定が読み込まれていません。<br>GETボタンを押して設定を読み込んでください。";
-        return;
-    }
-    startWebUsbGps();
-}
-
 // GPS監視を停止する
 async function stopGps() {
-    // 💡 停止時にもレート計測タイマーを停止
-    stopRateMeasurement(); 
-
+    // 💡 レート計測用変数をリセット
+    updateIntervalHistory = [];
+    lastRateCalculationTime = 0;
+    currentUpdateRate = 0;
+    
     keepReading = false;
     if (device) {
         try {
@@ -707,21 +668,38 @@ async function stopGps() {
 
 // WebUSBからの位置情報更新処理
 function onWebUsbPositionUpdate(position) {
-    // ストップウォッチがRUN状態でない場合は、ラップ計測とレート計測をスキップ
     if (swState !== SW_STATE.RUN || !isGpsRunning) {
         return;
     }
     
-    // --- 更新レート計測ロジックの実行 ---
-    updateCounter++; // ★ データが来るたびにカウントアップ
-    lastUpdateTime = Date.now();
-    // ------------------------------------
-    
     const currentLat = position.coords.latitude;
     const currentLon = position.coords.longitude;
     const currentTime = Date.now();
+
+    // --- 💡 レート計測ロジックを統合 ---
+    if (lastRateCalculationTime > 0) {
+        const interval = currentTime - lastRateCalculationTime;
+        
+        // 履歴を更新
+        updateIntervalHistory.push(interval);
+        if (updateIntervalHistory.length > RATE_HISTORY_SIZE) {
+            updateIntervalHistory.shift();
+        }
+        
+        // 移動平均インターバルを計算
+        const totalInterval = updateIntervalHistory.reduce((a, b) => a + b, 0);
+        const averageInterval = totalInterval / updateIntervalHistory.length;
+        
+        // レートを計算 (Hz)
+        currentUpdateRate = 1000 / averageInterval;
+    } else {
+        // 初回はレートを 0 に設定
+        currentUpdateRate = 0; 
+    }
+    lastRateCalculationTime = currentTime;
+    // ------------------------------------
     
-    // ヘルパー関数群（変更なし）
+    // ... ヘルパー関数群（変更なし） ...
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
         const R = 6371e3;
         const φ1 = lat1 * Math.PI / 180;
@@ -756,6 +734,7 @@ function onWebUsbPositionUpdate(position) {
         if (ratio < 0 || ratio > 1) return null;
         return p1.time + (p2.time - p1.time) * ratio;
     };
+
 
     if (!lastPosition) {
         lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
