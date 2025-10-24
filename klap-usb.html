@@ -280,7 +280,7 @@ let keepReading = true;
 let nmeaBuffer = '';
 const NMEA_VENDOR_ID = 0x1546;   
 const NMEA_PRODUCT_ID = 0x01A8;  
-// 💡 修正確定: NMEAが表示された設定値
+// 💡 NMEAが表示され、接続が確定した設定値
 const IN_ENDPOINT = 2;           
 const INTERFACE_NUMBER = 1; 
 
@@ -552,16 +552,27 @@ function processNmeaData(data) {
 
 // 1秒ごとに更新レートを計算して表示するタイマーを開始
 function startRateMeasurement() {
+    // 既存のタイマーがあれば停止し、NULLに戻す
     if (displayRateTimer !== null) {
         clearInterval(displayRateTimer);
+        displayRateTimer = null; // 💡 修正点: タイマーIDを確実にリセット
     }
+    
+    // 変数を初期化
     currentUpdateRate = 0;
     updateCounter = 0;
     
+    // 1秒ごとに実行する新しいタイマーを設定
     displayRateTimer = setInterval(() => {
+        // 1秒間にカウントされた回数をレートとして取得
         currentUpdateRate = updateCounter; 
+        
+        // カウンターをリセットして次の1秒の計測に備える
         updateCounter = 0; 
-        updateDebugDisplay(); // デバッグ表示を更新
+        
+        // デバッグ表示を更新 (ここでレートが画面に反映される)
+        updateDebugDisplay(); 
+        
     }, 1000); 
 }
 
@@ -569,7 +580,7 @@ function startRateMeasurement() {
 function stopRateMeasurement() {
     if (displayRateTimer !== null) {
         clearInterval(displayRateTimer);
-        displayRateTimer = null;
+        displayRateTimer = null; // 💡 停止時もIDをリセット
     }
     currentUpdateRate = 0;
 }
@@ -604,7 +615,7 @@ async function readLoop() {
                 const decoder = new TextDecoder('iso-8859-1');
                 const nmeaData = decoder.decode(result.data);
                 
-                // --- 💡 修正点: NMEAログの最新1行のみ表示 ---
+                // --- 💡 NMEAログの最新1行のみ表示 ---
                 if (nmeaLogElement && nmeaData.length > 0) {
                     const lines = nmeaData.trim().split('\n');
                     if (lines.length > 0) {
@@ -650,6 +661,7 @@ async function startWebUsbGps() {
         isGpsRunning = true;
         keepReading = true;
         
+        // 💡 レート計測タイマーを起動
         startRateMeasurement(); 
         readLoop(); 
         
@@ -671,6 +683,7 @@ function startGps() {
 
 // GPS監視を停止する
 async function stopGps() {
+    // 💡 停止時にもレート計測タイマーを停止
     stopRateMeasurement(); 
 
     keepReading = false;
@@ -694,12 +707,13 @@ async function stopGps() {
 
 // WebUSBからの位置情報更新処理
 function onWebUsbPositionUpdate(position) {
+    // ストップウォッチがRUN状態でない場合は、ラップ計測とレート計測をスキップ
     if (swState !== SW_STATE.RUN || !isGpsRunning) {
         return;
     }
     
     // --- 更新レート計測ロジックの実行 ---
-    updateCounter++;
+    updateCounter++; // ★ データが来るたびにカウントアップ
     lastUpdateTime = Date.now();
     // ------------------------------------
     
