@@ -628,10 +628,12 @@ function processNmeaData(data) {
                     const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
                     latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
                     
-                    // RMCが有効ならDEC表示を更新 (GGAとの競合回避のため、RMCを優先)
+                    // 💡 RMCが有効ならDEC表示を更新 (RMCを最優先)
                     if (latestRmcStatus === 'A') {
                         currentLat = dmsToDecimal(parts[3], parts[4]);
                         currentLon = dmsToDecimal(parts[5], parts[6]);
+                        // RMCが来たらすぐにリアルタイム更新を実行
+                        realTimeUpdateDebugInfo();
                     }
                     
                 } catch (e) {
@@ -639,20 +641,18 @@ function processNmeaData(data) {
                 }
             }
             
-            // 💡 GGAメッセージに関するデバッグ情報も更新 (修正箇所)
+            // GGAメッセージに関するデバッグ情報も更新
             if (line.toUpperCase().includes('GGA')) { 
                 try {
                     const parts = line.split(',');
                     const fixQuality = parseInt(parts[6]);
                     
-                    // GGAが有効なFIXの場合、DEC表示を更新
+                    // 💡 修正: GGAが有効なFIXの場合、DEC表示を無条件で更新 (RMCが優先しても、RMCが0HzのためGGAで上書きする)
                     if (fixQuality > 0) {
-                        // RMCが来ていない場合のみGGAのDEC情報を採用（RMCが優先）
-                        if(latestRmcStatus !== 'A') {
-                            currentLat = dmsToDecimal(parts[2], parts[3]);
-                            currentLon = dmsToDecimal(parts[4], parts[5]);
-                        }
+                        currentLat = dmsToDecimal(parts[2], parts[3]);
+                        currentLon = dmsToDecimal(parts[4], parts[5]);
                     }
+                    
                     // 💡 GGA生の緯度経度をデバッグ用に取得
                     const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
                     const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
@@ -714,12 +714,18 @@ function stopRateMeasurement() {
     currentGgaUpdateRate = 0;
 }
 
-// 💡 新規追加: リアルタイムで更新されるデバッグ情報 (GGA RAW DMMなど)
+// 💡 リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示)
 function realTimeUpdateDebugInfo() {
     const ggaRawDmmDisplay = document.getElementById('ggaRawDmmDisplay');
     if (ggaRawDmmDisplay) {
-        // GGA RAW DMMの表示のみリアルタイムで更新
+        // GGA RAW DMMの表示をリアルタイムで更新
         ggaRawDmmDisplay.textContent = `GGA RAW DMM: ${latestGgaRawLatLon}`;
+    }
+
+    // 💡 DEC表示のリアルタイム更新
+    const decLatLonDisplay = document.getElementById('decLatLonDisplay');
+    if (decLatLonDisplay) {
+        decLatLonDisplay.textContent = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
     }
 }
 
@@ -736,7 +742,8 @@ function updateDebugDisplay() {
     const ggaStatusText = `GGA Status: ${latestGgaStatus}`;
     
     // 小数点6桁のデシマル表示
-    const latLonText = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
+    // 💡 IDを付与してリアルタイム更新対象にする
+    const latLonText = `<span id="decLatLonDisplay">DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}</span>`; 
 
     // RMC生の緯度経度を表示
     const rmcRawText = `RMC RAW DMM: ${latestRmcRawLatLon}`;
@@ -757,7 +764,7 @@ function updateDebugDisplay() {
     const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
     elem.debugInfo.style.color = statusColor;
     
-    // 💡 初回描画時にリアルタイム更新要素を強制的に更新（要素が確実に存在するように）
+    // 初回描画時にリアルタイム更新要素を強制的に更新（要素が確実に存在するように）
     realTimeUpdateDebugInfo();
 }
 
