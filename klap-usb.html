@@ -135,6 +135,7 @@
         .active-blue:active { background-color: #0066cc; }
 
         #debug-overlay {
+            /* 💡 前回display: none; を削除 */
             position: absolute;
             top: 0;
             left: 0;
@@ -160,13 +161,15 @@
         }
         /* NMEAログ表示エリアのスタイル */
         #nmeaLog {
-            height: 30px; /* 1行が見える程度の高さに制限 */
-            overflow: hidden; /* スクロールを無効化 */
+            /* 💡 修正箇所: NMEAログ表示を非表示 */
+            display: none; 
+            height: 30px; 
+            overflow: hidden; 
             border: 1px solid #ccc; 
             padding: 5px; 
             font-size: 10px;
             background-color: #000;
-            white-space: pre; /* 折り返しを無効化して1行表示を強調 */
+            white-space: pre; 
             pointer-events: all; 
             line-height: 1;
         }
@@ -203,7 +206,6 @@
                 width: auto;
             }
             #nmeaLog {
-                /* モバイルでは少し大きく表示 */
                 font-size: 8px;
             }
         }
@@ -215,8 +217,10 @@
     <div id="debug-overlay">
         <p id="status-display" class="status-text">GPS設定: 未取得</p>
         <div id="debugInfo" class="status-text"></div>
-        <p class="status-text">NMEA Raw Data (Latest):</p>
-        <pre id="nmeaLog">No NMEA data yet...</pre>
+        <div id="nmea-raw-container">
+            <p class="status-text">NMEA Raw Data (Latest):</p>
+            <pre id="nmeaLog">No NMEA data yet...</pre>
+        </div>
     </div>
     
     <div id="main-content">
@@ -268,7 +272,8 @@ const elem = {
     lapButton: null,
     gpsButton: null,
     getSettingsBtn: null,
-    nmeaLog: null 
+    nmeaLog: null,
+    nmeaRawContainer: null // NMEAログとテキストを非表示にするためのコンテナを追加
 };
 
 // GPSラップ計測用変数 - localStorageから読み込む
@@ -298,7 +303,7 @@ let latestRmcRawLatLon = 'N/A';
 let rmcUpdateCounter = 0;
 let currentRmcUpdateRate = 0;
 
-// 💡 GGAデバッグ用変数 (新規追加)
+// 💡 GGAデバッグ用変数 
 let ggaUpdateCounter = 0;
 let currentGgaUpdateRate = 0;
 let latestGgaStatus = 'N/A'; // Fix Quality
@@ -463,14 +468,14 @@ const getSettings = () => {
         gpsThresholdValue = threshold ? parseFloat(threshold) : 20;
         lapCoolDown = coolDown ? parseFloat(coolDown) : 15000;     
 
-        elem.statusDisplay.textContent = `GPS設定: OK (閾値: ${gpsThresholdValue}m / C/D: ${lapCoolDown / 1000}秒)`;
-        elem.debugInfo.innerHTML = "GPS設定が読み込まれました。";
+        if (elem.statusDisplay) elem.statusDisplay.textContent = `GPS設定: OK (閾値: ${gpsThresholdValue}m / C/D: ${lapCoolDown / 1000}秒)`;
+        if (elem.debugInfo) elem.debugInfo.innerHTML = "GPS設定が読み込まれました。";
         isSettingsLoaded = true;
         elem.getSettingsBtn.classList.remove('no-setting');
         elem.getSettingsBtn.classList.add('active-blue');
     } else {
-        elem.statusDisplay.textContent = 'GPS設定: 未設定（設定ツールで保存してください）';
-        elem.debugInfo.innerHTML = "localStorageにGPS設定が見つかりません。";
+        if (elem.statusDisplay) elem.statusDisplay.textContent = 'GPS設定: 未設定（設定ツールで保存してください）';
+        if (elem.debugInfo) elem.debugInfo.innerHTML = "localStorageにGPS設定が見つかりません。";
         isSettingsLoaded = false;
         elem.getSettingsBtn.classList.remove('active-blue');
         elem.getSettingsBtn.classList.add('no-setting');
@@ -765,10 +770,13 @@ async function readLoop() {
                 updateCounter++;
 
                 if (nmeaLogElement && nmeaData.length > 0) {
-                    const lines = nmeaData.trim().split('\n');
-                    if (lines.length > 0) {
-                        const latestLine = lines[lines.length - 1].trim(); 
-                        nmeaLogElement.textContent = latestLine; 
+                    // NMEAログ表示が非表示でも、ログデータを取得
+                    if (nmeaLogElement.style.display !== 'none') {
+                        const lines = nmeaData.trim().split('\n');
+                        if (lines.length > 0) {
+                            const latestLine = lines[lines.length - 1].trim(); 
+                            nmeaLogElement.textContent = latestLine; 
+                        }
                     }
                 }
                 
@@ -776,7 +784,7 @@ async function readLoop() {
             }
         } catch (error) {
             if (keepReading) {
-                elem.debugInfo.innerHTML = `USB読み取りエラー: ${error.message}`;
+                if (elem.debugInfo) elem.debugInfo.innerHTML = `USB読み取りエラー: ${error.message}`;
             }
             break; 
         }
@@ -786,7 +794,7 @@ async function readLoop() {
 // WebUSB接続を開始
 async function startWebUsbGps() {
     try {
-        elem.statusDisplay.textContent = 'USBデバイスを検索中...';
+        if (elem.statusDisplay) elem.statusDisplay.textContent = 'USBデバイスを検索中...';
         elem.gpsButton.textContent = '接続中...'; 
 
         device = await navigator.usb.requestDevice({
@@ -801,8 +809,8 @@ async function startWebUsbGps() {
         
         await device.claimInterface(INTERFACE_NUMBER);
         
-        elem.statusDisplay.textContent = 'GPSモジュール接続完了。データ監視中...';
-        elem.gpsButton.textContent = 'GPS';
+        if (elem.statusDisplay) elem.statusDisplay.textContent = 'GPSモジュール接続完了。データ監視中...';
+        elem.gpsButton.textContent = 'GPS (停止)';
         elem.gpsButton.classList.remove('no-gps');
         elem.gpsButton.classList.add('active-blue');
         isGpsRunning = true;
@@ -812,7 +820,7 @@ async function startWebUsbGps() {
         readLoop(); 
         
     } catch (error) {
-        elem.debugInfo.innerHTML = `USB接続エラー: ${error.message}`;
+        if (elem.debugInfo) elem.debugInfo.innerHTML = `USB接続エラー: ${error.message}`;
         stopGps();
     }
 }
@@ -820,7 +828,7 @@ async function startWebUsbGps() {
 // GPS監視を開始する
 function startGps() {
     if (!isSettingsLoaded) {
-        elem.debugInfo.innerHTML = "GPS設定が読み込まれていません。<br>GETボタンを押して設定を読み込んでください。";
+        if (elem.debugInfo) elem.debugInfo.innerHTML = "GPS設定が読み込まれていません。<br>GETボタンを押して設定を読み込んでください。";
         return;
     }
     startWebUsbGps();
@@ -841,7 +849,7 @@ async function stopGps() {
         device = null;
     }
     isGpsRunning = false;
-    elem.statusDisplay.textContent = 'GPS監視停止';
+    if (elem.statusDisplay) elem.statusDisplay.textContent = 'GPS監視停止';
     elem.gpsButton.textContent = 'GPS';
     elem.gpsButton.classList.remove('active-blue');
     elem.gpsButton.classList.add('no-gps');
@@ -898,39 +906,23 @@ function onWebUsbPositionUpdate(position) {
 
     const getIntersectionTime = (p1, p2, l1, l2, l3, l4) => {
         // p1(lat, lon, time), p2(lat, lon, time)
-        // l1(lat), l2(lon), l3(lat), l4(lon) - スタートラインの座標 (誤ってlon/lat順で渡されるのを防ぐため引数名変更)
-        const lineLat1 = l1; const lineLon1 = l2;
-        const lineLat2 = l3; const lineLon2 = l4;
+        // l1(lat), l2(lon), l3(lat), l4(lon) - スタートラインの座標
         
         // 分母
-        const A = (lineLon2 - lineLon1) * (p2.lat - p1.lat) - (lineLat2 - lineLat1) * (p2.lon - p1.lon);
-        if (Math.abs(A) < 1e-9) return null; // ほぼ平行
-        
-        // 分子 (P1->P2間の線分上の交差比率 t のための計算)
-        const num = (lineLat2 - lineLat1) * (p1.lon - lineLon1) - (lineLon2 - lineLon1) * (p1.lat - lineLat1);
-        const t = num / A;
-
-        if (t < 0 || t > 1) return null; // P1-P2の線分の外側で交差
-
-        // 比率を使って時間を補間
-        // 🚨 getIntersectionTimeの引数l1, l2, l3, l4は緯度と経度を交互に渡している前提の古いロジックを保持
-        // 従来のロジック: const A = (l4 - l2) * (p2.lon - p1.lon) - (l3 - l1) * (p2.lat - p1.lat); 
-        // 修正後のロジックでは、緯度と経度が正しくp1/p2に渡されていることを確認し、Aを再計算
-        
-        // 幾何学的な交点計算のための比率
         const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
         if (Math.abs(den) < 1e-9) return null;
         
-        const u_num = (LAP_LINE_P1.lat - p1.lat) * (p2.lon - p1.lon) - (LAP_LINE_P1.lon - p1.lon) * (p2.lat - p1.lat);
-        const u = u_num / den;
-
-        if (u < 0 || u > 1) return null; // スタートラインの線分の外側
-
+        // P1->P2間の交差比率 t_ratio の分子
         const t_num = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon);
-        const t_ratio = t_num / den; // t_ratioはP1->P2間のどこで交差したかを示す 0〜1 の値
+        const t_ratio = t_num / den; 
 
         if (t_ratio < 0 || t_ratio > 1) return null; // P1-P2の線分の外側で交差
         
+        // スタートラインの線分の範囲チェック (u)
+        const u_num = (LAP_LINE_P1.lat - p1.lat) * (p2.lon - p1.lon) - (LAP_LINE_P1.lon - p1.lon) * (p2.lat - p1.lat);
+        const u = u_num / den;
+        if (u < 0 || u > 1) return null; // スタートラインの線分の外側
+
         // 比率を使って時間を補間
         return p1.time + (p2.time - p1.time) * t_ratio;
     };
@@ -957,7 +949,7 @@ function onWebUsbPositionUpdate(position) {
 
     if (isCrossingLine && isCoolDownOver && isNearStartLine) {
         
-        // 💡 修正済み: 速度に依存しない、純粋な直線補間用の位置データ
+        // 速度に依存しない、純粋な直線補間用の位置データ
         const P1_for_Intersection = { 
             lat: lastPosition.lat, 
             lon: lastPosition.lon, 
@@ -973,10 +965,10 @@ function onWebUsbPositionUpdate(position) {
         const estimatedCrossingTime = getIntersectionTime(
             P1_for_Intersection, 
             P2_for_Intersection, 
-            LAP_LINE_P1.lat, // l1
-            LAP_LINE_P1.lon, // l2
-            LAP_LINE_P2.lat, // l3
-            LAP_LINE_P2.lon  // l4
+            LAP_LINE_P1.lat, 
+            LAP_LINE_P1.lon, 
+            LAP_LINE_P2.lat, 
+            LAP_LINE_P2.lon 
         );
         
         let lapTimeBase;
@@ -1038,6 +1030,14 @@ window.addEventListener('load', () => {
     elem.gpsButton = document.getElementById('gpsButton');
     elem.getSettingsBtn = document.getElementById('getSettingsBtn');
     elem.nmeaLog = document.getElementById('nmeaLog'); 
+    // 新しいコンテナ要素を取得
+    elem.nmeaRawContainer = document.getElementById('nmea-raw-container'); 
+    
+    // NMEAログとそのラベルを非表示にする
+    if (elem.nmeaRawContainer) {
+        elem.nmeaRawContainer.style.display = 'none';
+    }
+
 
     if (elem.startButton) elem.startButton.addEventListener('click', clickStartSW);
     if (elem.lapButton) elem.lapButton.addEventListener('click', clickLapSW);
@@ -1055,4 +1055,3 @@ window.addEventListener('load', () => {
 </body>
 
 </html>
-
