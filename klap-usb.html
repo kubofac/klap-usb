@@ -3,9 +3,10 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, user-scalable=no">
-    <title>KLAP_ver3 (WebUSB 10Hz対応)</title>
+    <title>KLAP_ver3 (WebUSB 10Hz対応 - 速度非依存)</title>
     <link rel="manifest" href="/manifest.json">
     <style>
+        /* (スタイルシート部分は省略) */
         html, body {
             height: 100%;
             margin: 0;
@@ -305,7 +306,7 @@ let latestGgaRawLatLon = 'N/A';
 // ------------------------------------
 
 
-// --- ストップウォッチ関連の関数（省略） ---
+// --- ストップウォッチ関連の関数 ---
 
 const totalTimePrint = (time) => {
     let h = Math.floor(time / 3600000);
@@ -478,7 +479,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数 (dmsToDecimal, parseNmeaLine修正)
+// WebUSB/NMEA/更新レート関連の関数 
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -537,10 +538,9 @@ function parseNmeaLine(line) {
     const parts = line.split(',');
     
     // ----------------------------------------------------
-    // 💡 RMCメッセージの判定と処理 (RMCレートのカウント)
+    // 💡 RMCメッセージの判定と処理 
     // ----------------------------------------------------
     if (parts[0].toUpperCase().endsWith('RMC') && parts.length >= 10) {
-        // RMCが解析成功し、かつ有効なFix ('A') のときのみ緯度経度を処理
         if (parts[2] === 'A') {
             const lat = dmsToDecimal(parts[3], parts[4]);
             const lon = dmsToDecimal(parts[5], parts[6]); 
@@ -552,7 +552,6 @@ function parseNmeaLine(line) {
                 return null;
             }
             
-            // 有効なRMCメッセージが解析されたときのみカウント
             rmcUpdateCounter++; 
 
             return {
@@ -565,12 +564,11 @@ function parseNmeaLine(line) {
                 timestamp: Date.now() 
             };
         }
-        // RMCが来たがステータスが'V'、または緯度経度が無効な場合はnullを返す
         return null;
     } 
     
     // ----------------------------------------------------
-    // 💡 GNGGAメッセージの判定と処理 (修正箇所)
+    // 💡 GNGGAメッセージの判定と処理 (10Hzの位置情報供給源)
     // ----------------------------------------------------
     else if (parts[0].toUpperCase().endsWith('GGA') && parts.length >= 7) {
         ggaUpdateCounter++; // GGAメッセージが来たらカウント
@@ -578,7 +576,7 @@ function parseNmeaLine(line) {
         const fixQuality = parseInt(parts[6]);
         latestGgaStatus = fixQuality > 0 ? `FIX(${fixQuality})` : 'NO FIX';
         
-        // 💡 修正: GGAが有効なFIX (Fix Quality > 0) の場合、座標を抽出して返す
+        // GGAが有効なFIX (Fix Quality > 0) の場合、座標を抽出して返す
         if (fixQuality > 0) {
             const lat = dmsToDecimal(parts[2], parts[3]); 
             const lon = dmsToDecimal(parts[4], parts[5]);
@@ -598,7 +596,6 @@ function parseNmeaLine(line) {
                 };
             }
         }
-        // GGAが来たがFIXがないか、座標が無効な場合はnullを返す
         return null;
     }
 
@@ -628,11 +625,10 @@ function processNmeaData(data) {
                     const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
                     latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
                     
-                    // 💡 RMCが有効ならDEC表示を更新 (RMCを最優先)
+                    // RMCが有効ならDEC表示を更新 (RMCを最優先)
                     if (latestRmcStatus === 'A') {
                         currentLat = dmsToDecimal(parts[3], parts[4]);
                         currentLon = dmsToDecimal(parts[5], parts[6]);
-                        // RMCが来たらすぐにリアルタイム更新を実行
                         realTimeUpdateDebugInfo();
                     }
                     
@@ -647,18 +643,18 @@ function processNmeaData(data) {
                     const parts = line.split(',');
                     const fixQuality = parseInt(parts[6]);
                     
-                    // 💡 修正: GGAが有効なFIXの場合、DEC表示を無条件で更新 (RMCが優先しても、RMCが0HzのためGGAで上書きする)
+                    // GGAが有効なFIXの場合、DEC表示を無条件で更新
                     if (fixQuality > 0) {
                         currentLat = dmsToDecimal(parts[2], parts[3]);
                         currentLon = dmsToDecimal(parts[4], parts[5]);
                     }
                     
-                    // 💡 GGA生の緯度経度をデバッグ用に取得
+                    // GGA生の緯度経度をデバッグ用に取得
                     const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
                     const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
                     latestGgaRawLatLon = `${rawLat} / ${rawLon}`;
                     
-                    // 💡 リアルタイム表示を更新
+                    // リアルタイム表示を更新
                     realTimeUpdateDebugInfo();
 
                 } catch (e) { /* ... */ }
@@ -680,7 +676,6 @@ function startRateMeasurement() {
     
     currentUpdateRate = 0;
     updateCounter = 0; 
-    // RMCレート、GGAレート計測用のカウンターをリセット
     currentRmcUpdateRate = 0;
     rmcUpdateCounter = 0;
     currentGgaUpdateRate = 0;
@@ -690,15 +685,12 @@ function startRateMeasurement() {
         currentUpdateRate = updateCounter; 
         updateCounter = 0; 
         
-        // RMCレート計測の計算
         currentRmcUpdateRate = rmcUpdateCounter;
-        rmcUpdateCounter = 0; // カウンターをリセット
+        rmcUpdateCounter = 0; 
         
-        // GGAレート計測の計算
         currentGgaUpdateRate = ggaUpdateCounter;
-        ggaUpdateCounter = 0; // カウンターをリセット
+        ggaUpdateCounter = 0; 
         
-        // 💡 レート更新は1秒ごと
         updateDebugDisplay(); 
     }, 1000); 
 }
@@ -714,15 +706,13 @@ function stopRateMeasurement() {
     currentGgaUpdateRate = 0;
 }
 
-// 💡 リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示)
+// リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示) 
 function realTimeUpdateDebugInfo() {
     const ggaRawDmmDisplay = document.getElementById('ggaRawDmmDisplay');
     if (ggaRawDmmDisplay) {
-        // GGA RAW DMMの表示をリアルタイムで更新
         ggaRawDmmDisplay.textContent = `GGA RAW DMM: ${latestGgaRawLatLon}`;
     }
 
-    // 💡 DEC表示のリアルタイム更新
     const decLatLonDisplay = document.getElementById('decLatLonDisplay');
     if (decLatLonDisplay) {
         decLatLonDisplay.textContent = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
@@ -734,18 +724,13 @@ function realTimeUpdateDebugInfo() {
 function updateDebugDisplay() {
     if (!elem.debugInfo) return;
 
-    // NMEA総レート、RMCレート、GGAレートを分けて表示
     const rateText = `総レート: ${currentUpdateRate.toFixed(0)} Hz | RMCレート: ${currentRmcUpdateRate.toFixed(0)} Hz | GGAレート: ${currentGgaUpdateRate.toFixed(0)} Hz`;
     
-    // RMCステータスとGGAステータスを表示
     const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
     const ggaStatusText = `GGA Status: ${latestGgaStatus}`;
     
-    // 小数点6桁のデシマル表示
-    // 💡 IDを付与してリアルタイム更新対象にする
     const latLonText = `<span id="decLatLonDisplay">DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}</span>`; 
 
-    // RMC生の緯度経度を表示
     const rmcRawText = `RMC RAW DMM: ${latestRmcRawLatLon}`;
     
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
@@ -760,11 +745,9 @@ function updateDebugDisplay() {
         ${speedText} | ${lapCountText}
     `;
     
-    // RMCステータスに応じて色を付ける (A=緑, V=赤)
     const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
     elem.debugInfo.style.color = statusColor;
     
-    // 初回描画時にリアルタイム更新要素を強制的に更新（要素が確実に存在するように）
     realTimeUpdateDebugInfo();
 }
 
@@ -886,7 +869,7 @@ function onWebUsbPositionUpdate(position) {
     const currentLon = position.coords.longitude;
     const currentTime = Date.now();
     
-    // ヘルパー関数群（省略）
+    // ヘルパー関数群
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
         const R = 6371e3;
         const φ1 = lat1 * Math.PI / 180;
@@ -914,17 +897,51 @@ function onWebUsbPositionUpdate(position) {
     };
 
     const getIntersectionTime = (p1, p2, l1, l2, l3, l4) => {
-        const A = (l4 - l2) * (p2.lon - p1.lon) - (l3 - l1) * (p2.lat - p1.lat);
-        if (A === 0) return null;
-        const B = (l3 - l1) * (p1.lat - l2) - (l4 - l2) * (p1.lon - l1);
-        const ratio = B / A;
-        if (ratio < 0 || ratio > 1) return null;
-        return p1.time + (p2.time - p1.time) * ratio;
+        // p1(lat, lon, time), p2(lat, lon, time)
+        // l1(lat), l2(lon), l3(lat), l4(lon) - スタートラインの座標 (誤ってlon/lat順で渡されるのを防ぐため引数名変更)
+        const lineLat1 = l1; const lineLon1 = l2;
+        const lineLat2 = l3; const lineLon2 = l4;
+        
+        // 分母
+        const A = (lineLon2 - lineLon1) * (p2.lat - p1.lat) - (lineLat2 - lineLat1) * (p2.lon - p1.lon);
+        if (Math.abs(A) < 1e-9) return null; // ほぼ平行
+        
+        // 分子 (P1->P2間の線分上の交差比率 t のための計算)
+        const num = (lineLat2 - lineLat1) * (p1.lon - lineLon1) - (lineLon2 - lineLon1) * (p1.lat - lineLat1);
+        const t = num / A;
+
+        if (t < 0 || t > 1) return null; // P1-P2の線分の外側で交差
+
+        // 比率を使って時間を補間
+        // 🚨 getIntersectionTimeの引数l1, l2, l3, l4は緯度と経度を交互に渡している前提の古いロジックを保持
+        // 従来のロジック: const A = (l4 - l2) * (p2.lon - p1.lon) - (l3 - l1) * (p2.lat - p1.lat); 
+        // 修正後のロジックでは、緯度と経度が正しくp1/p2に渡されていることを確認し、Aを再計算
+        
+        // 幾何学的な交点計算のための比率
+        const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
+        if (Math.abs(den) < 1e-9) return null;
+        
+        const u_num = (LAP_LINE_P1.lat - p1.lat) * (p2.lon - p1.lon) - (LAP_LINE_P1.lon - p1.lon) * (p2.lat - p1.lat);
+        const u = u_num / den;
+
+        if (u < 0 || u > 1) return null; // スタートラインの線分の外側
+
+        const t_num = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon);
+        const t_ratio = t_num / den; // t_ratioはP1->P2間のどこで交差したかを示す 0〜1 の値
+
+        if (t_ratio < 0 || t_ratio > 1) return null; // P1-P2の線分の外側で交差
+        
+        // 比率を使って時間を補間
+        return p1.time + (p2.time - p1.time) * t_ratio;
     };
 
     if (!lastPosition) {
-        // GGAから速度情報は取得できないため、速度は一旦 0 に設定される
-        lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed || 0 }; 
+        lastPosition = { 
+            lat: currentLat, 
+            lon: currentLon, 
+            time: currentTime, 
+            speed: position.coords.speed || 0 
+        }; 
         previousSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
         return;
     }
@@ -940,34 +957,31 @@ function onWebUsbPositionUpdate(position) {
 
     if (isCrossingLine && isCoolDownOver && isNearStartLine) {
         
-        // 速度情報がRMCから取れない場合、直線補間で交差時間を推定する
-        const timeDelta = currentTime - lastPosition.time;
-        const speed = lastPosition.speed || 0; 
-        const distanceMoved = speed * timeDelta / 1000; 
-        
-        const deltaLat = currentLat - lastPosition.lat;
-        const deltaLon = currentLon - lastPosition.lon;
-        const currentToLastDistance = calculateDistance(currentLat, currentLon, lastPosition.lat, lastPosition.lon);
+        // 💡 修正済み: 速度に依存しない、純粋な直線補間用の位置データ
+        const P1_for_Intersection = { 
+            lat: lastPosition.lat, 
+            lon: lastPosition.lon, 
+            time: lastPosition.time 
+        };
+        const P2_for_Intersection = { 
+            lat: currentLat, 
+            lon: currentLon, 
+            time: currentTime 
+        };
 
-        let predictedPosition;
-        if (currentToLastDistance > 0) {
-            // 最後の位置と現在の位置の間の線分上に交差点があるかを確認
-            const ratio = distanceMoved / currentToLastDistance;
-            predictedPosition = {
-                lat: lastPosition.lat + deltaLat * ratio, 
-                lon: lastPosition.lon + deltaLon * ratio,
-                time: currentTime 
-            };
-        } else {
-            // 移動距離がゼロの場合は現在の位置を使用
-            predictedPosition = { lat: currentLat, lon: currentLon, time: currentTime };
-        }
-
-        const estimatedCrossingTime = getIntersectionTime(lastPosition, predictedPosition, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+        // P1とP2を結ぶ線分と、スタートラインの交差時刻を推定
+        const estimatedCrossingTime = getIntersectionTime(
+            P1_for_Intersection, 
+            P2_for_Intersection, 
+            LAP_LINE_P1.lat, // l1
+            LAP_LINE_P1.lon, // l2
+            LAP_LINE_P2.lat, // l3
+            LAP_LINE_P2.lon  // l4
+        );
         
         let lapTimeBase;
-        // 推定交差時間が妥当な範囲内にあるかチェック
-        if (estimatedCrossingTime && Math.abs(estimatedCrossingTime - currentTime) < 10000) {
+        // 推定交差時間が妥当な範囲内にあるかチェック（P1とP2の時刻間であるべき）
+        if (estimatedCrossingTime && estimatedCrossingTime >= lastPosition.time && estimatedCrossingTime <= currentTime) {
             lapTimeBase = estimatedCrossingTime;
         } else {
             // 推定に失敗した場合は、現在の時刻を使用
@@ -995,7 +1009,12 @@ function onWebUsbPositionUpdate(position) {
     }
 
     // 速度はposition.coords.speed（RMCから取得）または前回の速度（GGAの場合）
-    lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed !== undefined ? position.coords.speed : (lastPosition ? lastPosition.speed : 0) };
+    lastPosition = { 
+        lat: currentLat, 
+        lon: currentLon, 
+        time: currentTime, 
+        speed: position.coords.speed !== undefined ? position.coords.speed : (lastPosition ? lastPosition.speed : 0) 
+    };
     previousSideOfLine = currentSideOfLine;
 }
 
