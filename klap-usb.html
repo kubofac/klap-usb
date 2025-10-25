@@ -628,7 +628,7 @@ function processNmeaData(data) {
                     const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
                     latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
                     
-                    // 💡 RMCが有効ならDEC表示を更新 (GGAとの競合回避のため、RMCを優先)
+                    // RMCが有効ならDEC表示を更新 (GGAとの競合回避のため、RMCを優先)
                     if (latestRmcStatus === 'A') {
                         currentLat = dmsToDecimal(parts[3], parts[4]);
                         currentLon = dmsToDecimal(parts[5], parts[6]);
@@ -645,7 +645,7 @@ function processNmeaData(data) {
                     const parts = line.split(',');
                     const fixQuality = parseInt(parts[6]);
                     
-                    // 💡 GGAが有効なFIXの場合、DEC表示を更新
+                    // GGAが有効なFIXの場合、DEC表示を更新
                     if (fixQuality > 0) {
                         // RMCが来ていない場合のみGGAのDEC情報を採用（RMCが優先）
                         if(latestRmcStatus !== 'A') {
@@ -657,6 +657,9 @@ function processNmeaData(data) {
                     const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
                     const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
                     latestGgaRawLatLon = `${rawLat} / ${rawLon}`;
+                    
+                    // 💡 リアルタイム表示を更新
+                    realTimeUpdateDebugInfo();
 
                 } catch (e) { /* ... */ }
             }
@@ -695,6 +698,7 @@ function startRateMeasurement() {
         currentGgaUpdateRate = ggaUpdateCounter;
         ggaUpdateCounter = 0; // カウンターをリセット
         
+        // 💡 レート更新は1秒ごと
         updateDebugDisplay(); 
     }, 1000); 
 }
@@ -709,6 +713,16 @@ function stopRateMeasurement() {
     currentRmcUpdateRate = 0; 
     currentGgaUpdateRate = 0;
 }
+
+// 💡 新規追加: リアルタイムで更新されるデバッグ情報 (GGA RAW DMMなど)
+function realTimeUpdateDebugInfo() {
+    const ggaRawDmmDisplay = document.getElementById('ggaRawDmmDisplay');
+    if (ggaRawDmmDisplay) {
+        // GGA RAW DMMの表示のみリアルタイムで更新
+        ggaRawDmmDisplay.textContent = `GGA RAW DMM: ${latestGgaRawLatLon}`;
+    }
+}
+
 
 // デバッグ表示を更新する関数
 function updateDebugDisplay() {
@@ -726,7 +740,6 @@ function updateDebugDisplay() {
 
     // RMC生の緯度経度を表示
     const rmcRawText = `RMC RAW DMM: ${latestRmcRawLatLon}`;
-    const ggaRawText = `GGA RAW DMM: ${latestGgaRawLatLon}`;
     
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
     const lapCountText = `周回数: ${lapCount}`; 
@@ -736,13 +749,16 @@ function updateDebugDisplay() {
         ${rmcStatusText} | ${ggaStatusText}<br>
         ${latLonText}<br>
         ${rmcRawText}<br>
-        ${ggaRawText}<br>
+        <span id="ggaRawDmmDisplay">GGA RAW DMM: ${latestGgaRawLatLon}</span><br>
         ${speedText} | ${lapCountText}
     `;
     
     // RMCステータスに応じて色を付ける (A=緑, V=赤)
     const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
     elem.debugInfo.style.color = statusColor;
+    
+    // 💡 初回描画時にリアルタイム更新要素を強制的に更新（要素が確実に存在するように）
+    realTimeUpdateDebugInfo();
 }
 
 // WebUSBデータ読み取りループ
