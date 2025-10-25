@@ -202,7 +202,7 @@
                 width: auto;
             }
             #nmeaLog {
-                 /* モバイルでは少し大きく表示 */
+                /* モバイルでは少し大きく表示 */
                 font-size: 8px;
             }
         }
@@ -215,7 +215,7 @@
         <p id="status-display" class="status-text">GPS設定: 未取得</p>
         <div id="debugInfo" class="status-text"></div>
         <p class="status-text">NMEA Raw Data (Latest):</p>
-        <pre id="nmeaLog"></pre>
+        <pre id="nmeaLog">No NMEA data yet...</pre>
     </div>
     
     <div id="main-content">
@@ -278,17 +278,17 @@ let LAP_LINE_P2 = { lat: 0, lon: 0 };
 let device = null;
 let keepReading = true;
 let nmeaBuffer = '';
-const NMEA_VENDOR_ID = 0x1546;   
-const NMEA_PRODUCT_ID = 0x01A8;  
+const NMEA_VENDOR_ID = 0x1546;    
+const NMEA_PRODUCT_ID = 0x01A8;  
 // 💡 NMEAが表示され、接続が確定した設定値
-const IN_ENDPOINT = 2;           
-const INTERFACE_NUMBER = 1; 
+const IN_ENDPOINT = 2;            
+const INTERFACE_NUMBER = 1;
 
 // --- 更新レート/デバッグ表示用変数 ---
-let lastUpdateTime = 0; 
-let updateCounter = 0; 
-let displayRateTimer = null; 
-let currentUpdateRate = 0; 
+let lastUpdateTime = 0; 
+let updateCounter = 0; 
+let displayRateTimer = null; 
+let currentUpdateRate = 0; 
 let currentLat = 0.0;
 let currentLon = 0.0;
 
@@ -430,6 +430,7 @@ const clickResetSW = () => {
     if (elem.display1) elem.display1.textContent = '00:00.000';
     updateButtonDisplay();
     
+    // GPSを停止（念のため）
     stopGps();
 };
 
@@ -473,7 +474,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数 (ログ表示ロジックを修正)
+// WebUSB/NMEA/更新レート関連の関数 (修正箇所)
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -527,20 +528,18 @@ function processNmeaData(data) {
         if (line.startsWith('$') && line.length > 5) {
             const position = parseNmeaLine(line);
             
-            if (position) {
-                // 有効な位置情報（ステータス 'A'）であればデバッグ用変数を更新
-                currentLat = position.coords.latitude;
-                currentLon = position.coords.longitude;
-            } else if (line.includes('RMC')) {
-                 // RMCデータだがステータス 'V' で解析失敗した場合も緯度経度を取得してデバッグ表示を更新
+            // 💡 修正点2: 全てのRMCセンテンスから緯度経度を抽出してグローバル変数を更新
+            if (line.includes('RMC')) {
                  try {
                      const parts = line.split(',');
-                     if (parts.length >= 7 && parts[2] === 'V') {
-                          currentLat = dmsToDecimal(parts[3], parts[4]);
-                          currentLon = dmsToDecimal(parts[5], parts[6]);
-                     }
-                 } catch (e) {}
-            }
+                     // parts[3]とparts[5]が緯度経度、parts[4]とparts[6]がN/S/E/W
+                     // RMCステータス ('A' or 'V') にかかわらず、デバッグ表示用に緯度経度を更新
+                     currentLat = dmsToDecimal(parts[3], parts[4]);
+                     currentLon = dmsToDecimal(parts[5], parts[6]);
+                 } catch (e) {
+                     // 解析失敗時は何もしない
+                 }
+             }
             
             // onWebUsbPositionUpdateの呼び出しは position が有効な場合 ('A' ステータス) のみ
             if (position && swState === SW_STATE.RUN) {
@@ -555,7 +554,7 @@ function startRateMeasurement() {
     // 既存のタイマーがあれば停止し、NULLに戻す
     if (displayRateTimer !== null) {
         clearInterval(displayRateTimer);
-        displayRateTimer = null; // 💡 修正点: タイマーIDを確実にリセット
+        displayRateTimer = null;
     }
     
     // 変数を初期化
@@ -580,7 +579,7 @@ function startRateMeasurement() {
 function stopRateMeasurement() {
     if (displayRateTimer !== null) {
         clearInterval(displayRateTimer);
-        displayRateTimer = null; // 💡 停止時もIDをリセット
+        displayRateTimer = null; 
     }
     currentUpdateRate = 0;
 }
@@ -594,6 +593,11 @@ function updateDebugDisplay() {
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
 
     const lapCountText = `周回数: ${lapCount}`; 
+
+    // NMEAログ要素も更新（readLoopで更新されるため、ここでは省略可能だが、初期表示のために維持）
+    // if (elem.nmeaLog && elem.nmeaLog.textContent === '') {
+    //     elem.nmeaLog.textContent = 'No NMEA data yet...';
+    // }
 
     elem.debugInfo.innerHTML = `
         ${rateText}<br>
@@ -615,7 +619,10 @@ async function readLoop() {
                 const decoder = new TextDecoder('iso-8859-1');
                 const nmeaData = decoder.decode(result.data);
                 
-                // --- 💡 NMEAログの最新1行のみ表示 ---
+                // 💡 修正点1: データが受信されるたびにカウンターをインクリメント
+                updateCounter++;
+
+                // --- NMEAログの最新1行のみ表示 (生のデータ表示) ---
                 if (nmeaLogElement && nmeaData.length > 0) {
                     const lines = nmeaData.trim().split('\n');
                     if (lines.length > 0) {
@@ -642,6 +649,7 @@ async function readLoop() {
 async function startWebUsbGps() {
     try {
         elem.statusDisplay.textContent = 'USBデバイスを検索中...';
+        elem.gpsButton.textContent = '接続中...'; // ボタンの見た目を更新
 
         device = await navigator.usb.requestDevice({
             filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }]
@@ -656,6 +664,7 @@ async function startWebUsbGps() {
         await device.claimInterface(INTERFACE_NUMBER);
         
         elem.statusDisplay.textContent = 'GPSモジュール接続完了。データ監視中...';
+        elem.gpsButton.textContent = 'GPS (停止)';
         elem.gpsButton.classList.remove('no-gps');
         elem.gpsButton.classList.add('active-blue');
         isGpsRunning = true;
@@ -689,6 +698,7 @@ async function stopGps() {
     keepReading = false;
     if (device) {
         try {
+            // device.reset(); // デバイスリセットは省略
             await device.releaseInterface(INTERFACE_NUMBER);
             await device.close();
         } catch (error) {
@@ -702,20 +712,23 @@ async function stopGps() {
     elem.gpsButton.classList.remove('active-blue');
     elem.gpsButton.classList.add('no-gps');
     
-    if(elem.nmeaLog) elem.nmeaLog.textContent = '';
+    // 💡 停止時にデバッグ表示をクリーンアップ
+    if(elem.nmeaLog) elem.nmeaLog.textContent = 'No NMEA data yet...';
+    currentLat = 0.0;
+    currentLon = 0.0;
+    lastPosition = null; // 位置情報もリセット
+    updateDebugDisplay();
 }
 
 // WebUSBからの位置情報更新処理
 function onWebUsbPositionUpdate(position) {
-    // ストップウォッチがRUN状態でない場合は、ラップ計測とレート計測をスキップ
+    // ストップウォッチがRUN状態でない場合は、ラップ計測をスキップ
     if (swState !== SW_STATE.RUN || !isGpsRunning) {
         return;
     }
     
-    // --- 更新レート計測ロジックの実行 ---
-    updateCounter++; // ★ データが来るたびにカウントアップ
+    // レート計測はreadLoopに移動
     lastUpdateTime = Date.now();
-    // ------------------------------------
     
     const currentLat = position.coords.latitude;
     const currentLon = position.coords.longitude;
@@ -830,8 +843,8 @@ function onWebUsbPositionUpdate(position) {
     lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
     previousSideOfLine = currentSideOfLine;
 
-    // リアルタイム表示を更新
-    updateDebugDisplay(); 
+    // リアルタイム表示を更新 (レートはsetIntervalで更新される)
+    // updateDebugDisplay(); // updateDebugDisplayはsetIntervalで呼ばれているため、ここでは不要
 }
 
 window.addEventListener('load', () => {
@@ -867,6 +880,7 @@ window.addEventListener('load', () => {
     totalTimePrint(0);
     if (elem.display1) elem.display1.textContent = '00:00.000';
     getSettings();
+    updateDebugDisplay(); // 初期表示を更新
 });
 </script>
 </body>
