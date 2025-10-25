@@ -552,7 +552,7 @@ function parseNmeaLine(line) {
                 return null;
             }
             
-            // 💡 修正箇所: 有効なRMCメッセージが解析されたときのみカウント
+            // 有効なRMCメッセージが解析されたときのみカウント
             rmcUpdateCounter++; 
 
             return {
@@ -565,24 +565,40 @@ function parseNmeaLine(line) {
                 timestamp: Date.now() 
             };
         }
+        // RMCが来たがステータスが'V'、または緯度経度が無効な場合はnullを返す
+        return null;
     } 
     
     // ----------------------------------------------------
-    // 💡 GNGGAメッセージの判定と処理 (GGAレートのカウント)
+    // 💡 GNGGAメッセージの判定と処理 (修正箇所)
     // ----------------------------------------------------
     else if (parts[0].toUpperCase().endsWith('GGA') && parts.length >= 7) {
-        ggaUpdateCounter++; // ★ GGAメッセージが来たらカウント
+        ggaUpdateCounter++; // GGAメッセージが来たらカウント
         
-        // GGAステータスを取得 (parts[6] - Fix Quality: 0=No Fix, 1=GPS Fix, 2=DGPS Fix, etc.)
         const fixQuality = parseInt(parts[6]);
         latestGgaStatus = fixQuality > 0 ? `FIX(${fixQuality})` : 'NO FIX';
         
-        // GGA生の緯度経度をデバッグ用に取得 (RMCとフォーマットが異なる場合があるため分離)
-        const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
-        const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
-        latestGgaRawLatLon = `${rawLat} / ${rawLon}`;
-        
-        // GGAからは測位情報を返さない（RMCを優先するため）
+        // 💡 修正: GGAが有効なFIX (Fix Quality > 0) の場合、座標を抽出して返す
+        if (fixQuality > 0) {
+            const lat = dmsToDecimal(parts[2], parts[3]); 
+            const lon = dmsToDecimal(parts[4], parts[5]);
+            
+            // GGAには速度情報がないため、lastPositionから速度を引き継ぐ
+            const currentSpeed = lastPosition && lastPosition.speed !== null ? lastPosition.speed : 0;
+            
+            if (!isNaN(lat) && !isNaN(lon)) {
+                return {
+                    coords: {
+                        latitude: lat,
+                        longitude: lon,
+                        speed: currentSpeed, 
+                        accuracy: 1
+                    },
+                    timestamp: Date.now() 
+                };
+            }
+        }
+        // GGAが来たがFIXがないか、座標が無効な場合はnullを返す
         return null;
     }
 
@@ -606,19 +622,43 @@ function processNmeaData(data) {
                 try {
                     const parts = line.split(',');
                     
-                    // 1. 小数点以下6桁のデシマル緯度・経度を更新 (画面上部表示用)
-                    currentLat = dmsToDecimal(parts[3], parts[4]);
-                    currentLon = dmsToDecimal(parts[5], parts[6]);
-
-                    // 2. RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
+                    // RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
                     latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
                     const rawLat = parts.length > 3 ? `${parts[3]} ${parts[4]}` : 'N/A';
                     const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
                     latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
                     
+                    // 💡 RMCが有効ならDEC表示を更新 (GGAとの競合回避のため、RMCを優先)
+                    if (latestRmcStatus === 'A') {
+                        currentLat = dmsToDecimal(parts[3], parts[4]);
+                        currentLon = dmsToDecimal(parts[5], parts[6]);
+                    }
+                    
                 } catch (e) {
                     console.error("RMC line parse error:", e, "Line:", line);
                 }
+            }
+            
+            // 💡 GGAメッセージに関するデバッグ情報も更新 (修正箇所)
+            if (line.toUpperCase().includes('GGA')) { 
+                try {
+                    const parts = line.split(',');
+                    const fixQuality = parseInt(parts[6]);
+                    
+                    // 💡 GGAが有効なFIXの場合、DEC表示を更新
+                    if (fixQuality > 0) {
+                        // RMCが来ていない場合のみGGAのDEC情報を採用（RMCが優先）
+                        if(latestRmcStatus !== 'A') {
+                            currentLat = dmsToDecimal(parts[2], parts[3]);
+                            currentLon = dmsToDecimal(parts[4], parts[5]);
+                        }
+                    }
+                    // 💡 GGA生の緯度経度をデバッグ用に取得
+                    const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
+                    const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
+                    latestGgaRawLatLon = `${rawLat} / ${rawLon}`;
+
+                } catch (e) { /* ... */ }
             }
             
             if (position && swState === SW_STATE.RUN) {
@@ -637,7 +677,7 @@ function startRateMeasurement() {
     
     currentUpdateRate = 0;
     updateCounter = 0; 
-    // 💡 RMCレート、GGAレート計測用のカウンターをリセット
+    // RMCレート、GGAレート計測用のカウンターをリセット
     currentRmcUpdateRate = 0;
     rmcUpdateCounter = 0;
     currentGgaUpdateRate = 0;
@@ -647,11 +687,11 @@ function startRateMeasurement() {
         currentUpdateRate = updateCounter; 
         updateCounter = 0; 
         
-        // 💡 RMCレート計測の計算
+        // RMCレート計測の計算
         currentRmcUpdateRate = rmcUpdateCounter;
         rmcUpdateCounter = 0; // カウンターをリセット
         
-        // 💡 GGAレート計測の計算
+        // GGAレート計測の計算
         currentGgaUpdateRate = ggaUpdateCounter;
         ggaUpdateCounter = 0; // カウンターをリセット
         
@@ -674,18 +714,19 @@ function stopRateMeasurement() {
 function updateDebugDisplay() {
     if (!elem.debugInfo) return;
 
-    // 💡 表示を修正: NMEA総レート、RMCレート、GGAレートを分けて表示
+    // NMEA総レート、RMCレート、GGAレートを分けて表示
     const rateText = `総レート: ${currentUpdateRate.toFixed(0)} Hz | RMCレート: ${currentRmcUpdateRate.toFixed(0)} Hz | GGAレート: ${currentGgaUpdateRate.toFixed(0)} Hz`;
     
-    // 💡 RMCステータスとGGAステータスを表示
+    // RMCステータスとGGAステータスを表示
     const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
     const ggaStatusText = `GGA Status: ${latestGgaStatus}`;
     
-    // 💡 小数点6桁のデシマル表示
+    // 小数点6桁のデシマル表示
     const latLonText = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
 
-    // 💡 RMC生の緯度経度を表示
-    const rmcRawText = `RAW DMM: ${latestRmcRawLatLon}`;
+    // RMC生の緯度経度を表示
+    const rmcRawText = `RMC RAW DMM: ${latestRmcRawLatLon}`;
+    const ggaRawText = `GGA RAW DMM: ${latestGgaRawLatLon}`;
     
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
     const lapCountText = `周回数: ${lapCount}`; 
@@ -695,6 +736,7 @@ function updateDebugDisplay() {
         ${rmcStatusText} | ${ggaStatusText}<br>
         ${latLonText}<br>
         ${rmcRawText}<br>
+        ${ggaRawText}<br>
         ${speedText} | ${lapCountText}
     `;
     
@@ -803,13 +845,13 @@ async function stopGps() {
     currentLon = 0.0;
     latestRmcStatus = 'N/A';
     latestRmcRawLatLon = 'N/A';
-    latestGgaStatus = 'N/A'; // 💡 リセット
-    latestGgaRawLatLon = 'N/A'; // 💡 リセット
+    latestGgaStatus = 'N/A';
+    latestGgaRawLatLon = 'N/A';
     lastPosition = null;
     updateDebugDisplay();
 }
 
-// WebUSBからの位置情報更新処理（省略）
+// WebUSBからの位置情報更新処理（ラップ計測ロジック）
 function onWebUsbPositionUpdate(position) {
     if (swState !== SW_STATE.RUN || !isGpsRunning) {
         return;
@@ -858,7 +900,8 @@ function onWebUsbPositionUpdate(position) {
     };
 
     if (!lastPosition) {
-        lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
+        // GGAから速度情報は取得できないため、速度は一旦 0 に設定される
+        lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed || 0 }; 
         previousSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
         return;
     }
@@ -874,36 +917,37 @@ function onWebUsbPositionUpdate(position) {
 
     if (isCrossingLine && isCoolDownOver && isNearStartLine) {
         
+        // 速度情報がRMCから取れない場合、直線補間で交差時間を推定する
         const timeDelta = currentTime - lastPosition.time;
-        const speed = position.coords.speed || 0; 
+        const speed = lastPosition.speed || 0; 
         const distanceMoved = speed * timeDelta / 1000; 
         
         const deltaLat = currentLat - lastPosition.lat;
         const deltaLon = currentLon - lastPosition.lon;
         const currentToLastDistance = calculateDistance(currentLat, currentLon, lastPosition.lat, lastPosition.lon);
 
-        let predictedLat, predictedLon;
+        let predictedPosition;
         if (currentToLastDistance > 0) {
+            // 最後の位置と現在の位置の間の線分上に交差点があるかを確認
             const ratio = distanceMoved / currentToLastDistance;
-            predictedLat = currentLat + deltaLat * ratio;
-            predictedLon = currentLon + deltaLon * ratio;
+            predictedPosition = {
+                lat: lastPosition.lat + deltaLat * ratio, 
+                lon: lastPosition.lon + deltaLon * ratio,
+                time: currentTime 
+            };
         } else {
-            predictedLat = currentLat;
-            predictedLon = currentLon;
+            // 移動距離がゼロの場合は現在の位置を使用
+            predictedPosition = { lat: currentLat, lon: currentLon, time: currentTime };
         }
-
-        const predictedPosition = {
-            lat: predictedLat,
-            lon: predictedLon,
-            time: currentTime + timeDelta
-        };
 
         const estimatedCrossingTime = getIntersectionTime(lastPosition, predictedPosition, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
         
         let lapTimeBase;
+        // 推定交差時間が妥当な範囲内にあるかチェック
         if (estimatedCrossingTime && Math.abs(estimatedCrossingTime - currentTime) < 10000) {
             lapTimeBase = estimatedCrossingTime;
         } else {
+            // 推定に失敗した場合は、現在の時刻を使用
             lapTimeBase = currentTime;
         }
 
@@ -927,7 +971,8 @@ function onWebUsbPositionUpdate(position) {
         lastLapTime = lapTimeBase;
     }
 
-    lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
+    // 速度はposition.coords.speed（RMCから取得）または前回の速度（GGAの場合）
+    lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed !== undefined ? position.coords.speed : (lastPosition ? lastPosition.speed : 0) };
     previousSideOfLine = currentSideOfLine;
 }
 
