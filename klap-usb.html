@@ -802,7 +802,7 @@ async function startWebUsbGps() {
         await device.claimInterface(INTERFACE_NUMBER);
         
         elem.statusDisplay.textContent = 'GPSモジュール接続完了。データ監視中...';
-        elem.gpsButton.textContent = 'GPS (停止)';
+        elem.gpsButton.textContent = 'GPS';
         elem.gpsButton.classList.remove('no-gps');
         elem.gpsButton.classList.add('active-blue');
         isGpsRunning = true;
@@ -1055,3 +1055,4 @@ window.addEventListener('load', () => {
 </body>
 
 </html>
+
