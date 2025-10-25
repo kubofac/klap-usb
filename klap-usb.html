@@ -516,8 +516,6 @@ function dmsToDecimal(dmm, direction) {
             const degrees = parseInt(degreeRaw);
             const minutes = parseInt(minuteRaw);
             
-            if (isNaN(degrees) || isNaN(minutes)) return NaN;
-            
             let decimal = degrees + (minutes / 60);
 
             if (direction === 'S' || direction === 'W') {
@@ -534,8 +532,10 @@ function dmsToDecimal(dmm, direction) {
 function parseNmeaLine(line) {
     const parts = line.split(',');
     
-    // RMCセンテンスで、ステータスが 'A' (Active) の場合のみ有効と見なす
-    if ((parts[0].endsWith('RMC') || parts[0].endsWith('RMC')) && parts.length >= 10 && parts[2] === 'A') {
+    // ----------------------------------------------------
+    // 💡 修正箇所: NMEAヘッダーの末尾がRMCであれば、どのGNSSプレフィックスでも受け入れる
+    // ----------------------------------------------------
+    if (parts[0].toUpperCase().endsWith('RMC') && parts.length >= 10 && parts[2] === 'A') {
         const lat = dmsToDecimal(parts[3], parts[4]);
         const lon = dmsToDecimal(parts[5], parts[6]); 
         
@@ -570,7 +570,7 @@ function processNmeaData(data) {
             const position = parseNmeaLine(line);
             
             // 💡 RMCセンテンスから緯度経度を抽出し、デバッグ表示用の変数を更新
-            if (line.includes('RMC')) {
+            if (line.toUpperCase().includes('RMC')) { // 修正後のロジックに合わせてincludes('RMC')を使用
                  try {
                      const parts = line.split(',');
                      
@@ -622,7 +622,7 @@ function startRateMeasurement() {
         // 💡 RMCレート計測の計算
         currentRmcUpdateRate = rmcUpdateCounter;
         rmcUpdateCounter = 0;
-        
+        
         updateDebugDisplay(); 
     }, 1000); 
 }
