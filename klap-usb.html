@@ -286,16 +286,11 @@ const INTERFACE_NUMBER = 1;
 
 // --- 更新レート/デバッグ表示用変数 ---
 let lastUpdateTime = 0; 
-let updateCounter = 0;  // 💡 レート計測からは外すが、定義は残す
-let displayRateTimer = null;  // 💡 使用しないが、互換性のため残す
+let updateCounter = 0; 
+let displayRateTimer = null; // 💡 setIntervalのID
 let currentUpdateRate = 0; 
 let currentLat = 0.0;
 let currentLon = 0.0;
-
-// 💡 追加: 移動平均レート計算用変数
-const RATE_HISTORY_SIZE = 5; 
-let updateIntervalHistory = []; 
-let lastRateCalculationTime = 0; 
 
 
 // --- ストップウォッチ関連の関数（変更なし） ---
@@ -478,7 +473,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数
+// WebUSB/NMEA/更新レート関連の関数 (これが修正対象でした)
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -555,14 +550,36 @@ function processNmeaData(data) {
     }
 }
 
-// 💡 レート計測タイマー関連関数は削除し、以下のupdateDebugDisplayのみ残す
+// 💡 問題となっていたレート計測タイマー関数 (setIntervalを使用)
+function startRateMeasurement() {
+    if (displayRateTimer !== null) {
+        clearInterval(displayRateTimer);
+        // 前回提案の修正（displayRateTimer = null;）を適用する前の状態
+    }
+    currentUpdateRate = 0;
+    updateCounter = 0;
+    
+    displayRateTimer = setInterval(() => {
+        currentUpdateRate = updateCounter; 
+        updateCounter = 0; 
+        updateDebugDisplay(); // デバッグ表示を更新
+    }, 1000); // 1秒ごとに実行
+}
+
+// 💡 レート計測を停止する関数
+function stopRateMeasurement() {
+    if (displayRateTimer !== null) {
+        clearInterval(displayRateTimer);
+        displayRateTimer = null;
+    }
+    currentUpdateRate = 0;
+}
 
 // デバッグ表示を更新する関数
 function updateDebugDisplay() {
     if (!elem.debugInfo) return;
 
-    // レート計算はonWebUsbPositionUpdate内で完了済み
-    const rateText = `レート: ${currentUpdateRate.toFixed(1)} Hz`;
+    const rateText = `レート: ${currentUpdateRate.toFixed(0)} Hz`;
     const latLonText = `緯度: ${currentLat.toFixed(6)} / 経度: ${currentLon.toFixed(6)}`;
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
 
@@ -630,7 +647,8 @@ async function startWebUsbGps() {
         isGpsRunning = true;
         keepReading = true;
         
-        // 💡 レート計測タイマー（setInterval）は削除し、readLoopのみを起動
+        // 💡 レート計測タイマーを起動
+        startRateMeasurement(); 
         readLoop(); 
         
     } catch (error) {
@@ -642,11 +660,9 @@ async function startWebUsbGps() {
 
 // GPS監視を停止する
 async function stopGps() {
-    // 💡 レート計測用変数をリセット
-    updateIntervalHistory = [];
-    lastRateCalculationTime = 0;
-    currentUpdateRate = 0;
-    
+    // 💡 停止時にもレート計測タイマーを停止
+    stopRateMeasurement(); 
+
     keepReading = false;
     if (device) {
         try {
@@ -668,38 +684,21 @@ async function stopGps() {
 
 // WebUSBからの位置情報更新処理
 function onWebUsbPositionUpdate(position) {
+    // ストップウォッチがRUN状態でない場合は、ラップ計測とレート計測をスキップ
     if (swState !== SW_STATE.RUN || !isGpsRunning) {
         return;
     }
     
+    // --- 更新レート計測ロジックの実行 ---
+    updateCounter++; // ★ データが来るたびにカウントアップ
+    lastUpdateTime = Date.now();
+    // ------------------------------------
+    
     const currentLat = position.coords.latitude;
     const currentLon = position.coords.longitude;
     const currentTime = Date.now();
-
-    // --- 💡 レート計測ロジックを統合 ---
-    if (lastRateCalculationTime > 0) {
-        const interval = currentTime - lastRateCalculationTime;
-        
-        // 履歴を更新
-        updateIntervalHistory.push(interval);
-        if (updateIntervalHistory.length > RATE_HISTORY_SIZE) {
-            updateIntervalHistory.shift();
-        }
-        
-        // 移動平均インターバルを計算
-        const totalInterval = updateIntervalHistory.reduce((a, b) => a + b, 0);
-        const averageInterval = totalInterval / updateIntervalHistory.length;
-        
-        // レートを計算 (Hz)
-        currentUpdateRate = 1000 / averageInterval;
-    } else {
-        // 初回はレートを 0 に設定
-        currentUpdateRate = 0; 
-    }
-    lastRateCalculationTime = currentTime;
-    // ------------------------------------
     
-    // ... ヘルパー関数群（変更なし） ...
+    // ヘルパー関数群（省略）
     const calculateDistance = (lat1, lon1, lat2, lon2) => {
         const R = 6371e3;
         const φ1 = lat1 * Math.PI / 180;
