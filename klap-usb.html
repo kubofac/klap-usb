@@ -1,239 +1,239 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, user-scalable=no">
-    <title>KLAP_ver3 (WebUSB 10Hz対応)</title>
-    <link rel="manifest" href="/manifest.json">
-    <style>
-        html, body {
-            height: 100%;
-            margin: 0;
-        }
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <title>KLAP_ver3 (WebUSB 10Hz対応)</title>
+    <link rel="manifest" href="/manifest.json">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
 
-        body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background-color: #000000;
-            color: #ffffff;
-            padding: 10px;
-            position: relative;
-        }
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #000000;
+            color: #ffffff;
+            padding: 10px;
+            position: relative;
+        }
 
-        #container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background: #1c1c1e;
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            padding: 20px;
-            max-width: 100%;
-            margin: 20px auto;
-            width: 100%;
-            box-sizing: border-box;
-            height: 100%;
-            position: relative;
-        }
-        
-        #main-content {
-            display: flex;
-            width: 100%;
-            gap: 20px;
-            align-items: flex-start;
-            justify-content: space-between;
-            flex-grow: 1;
-            margin-bottom: 20px;
-        }
+        #container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1c1c1e;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            padding: 20px;
+            max-width: 100%;
+            margin: 20px auto;
+            width: 100%;
+            box-sizing: border-box;
+            height: 100%;
+            position: relative;
+        }
+        
+        #main-content {
+            display: flex;
+            width: 100%;
+            gap: 20px;
+            align-items: flex-start;
+            justify-content: space-between;
+            flex-grow: 1;
+            margin-bottom: 20px;
+        }
 
-        #time-display-column {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-start;
-            flex-grow: 1;
-        }
+        #time-display-column {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            flex-grow: 1;
+        }
 
-        #lap-list-column {
-            display: flex;
-            flex-direction: column;
-            width: 400px;
-            flex-shrink: 0;
-        }
-        
-        #display1 {
-            font-size: 90px;
-            font-weight: bold;
-            color: #eeeeee;
-            margin-bottom: 5px;
-        }
+        #lap-list-column {
+            display: flex;
+            flex-direction: column;
+            width: 400px;
+            flex-shrink: 0;
+        }
+        
+        #display1 {
+            font-size: 90px;
+            font-weight: bold;
+            color: #eeeeee;
+            margin-bottom: 5px;
+        }
 
-        #display {
-            font-size: 60px;
-            font-weight: bold;
-            color: #cccccc;
-            margin-bottom: 10px;
-        }
+        #display {
+            font-size: 60px;
+            font-weight: bold;
+            color: #cccccc;
+            margin-bottom: 10px;
+        }
 
-        #lap_list {
-            width: 100%;
-            height: 200px;
-            overflow-y: auto;
-            border: none;
-            border-radius: 5px;
-            background-color: #1c1c1e;
-            padding: 10px;
-        }
+        #lap_list {
+            width: 100%;
+            height: 200px;
+            overflow-y: auto;
+            border: none;
+            border-radius: 5px;
+            background-color: #1c1c1e;
+            padding: 10px;
+        }
 
-        #lap_list div {
-            font-size: 2.5em;
-            margin-bottom: 5px;
-            color: #dddddd;
-        }
+        #lap_list div {
+            font-size: 2.5em;
+            margin-bottom: 5px;
+            color: #dddddd;
+        }
 
-        #buttons-row {
-            display: flex;
-            justify-content: space-around;
-            width: 100%;
-            gap: 15px;
-            padding-top: 10px;
-        }
+        #buttons-row {
+            display: flex;
+            justify-content: space-around;
+            width: 100%;
+            gap: 15px;
+            padding-top: 10px;
+        }
 
-        .button {
-            border: 1px solid #3a3a3c;
-            background-color: #2c2c2e;
-            padding: 10px 15px;
-            color: #ffffff;
-            font-size: 16px;
-            font-weight: 500;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s ease;
-            text-align: center;
-            flex-grow: 1;
-        }
-        
-        .button:hover { background-color: #4a4a4e; }
-        #start:active { background-color: #4a804a; }
-        #reset:active { background-color: #993333; }
-        #lap:active { background-color: #4a4a4e; }
-        
-        .no-setting { background-color: #ff4d4d; }
-        .no-setting:hover { background-color: #ff6666; }
-        .no-setting:active { background-color: #e64444; }
+        .button {
+            border: 1px solid #3a3a3c;
+            background-color: #2c2c2e;
+            padding: 10px 15px;
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 500;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            text-align: center;
+            flex-grow: 1;
+        }
+        
+        .button:hover { background-color: #4a4a4e; }
+        #start:active { background-color: #4a804a; }
+        #reset:active { background-color: #993333; }
+        #lap:active { background-color: #4a4a4e; }
+        
+        .no-setting { background-color: #ff4d4d; }
+        .no-setting:hover { background-color: #ff6666; }
+        .no-setting:active { background-color: #e64444; }
 
-        .no-gps { background-color: #ff4d4d; }
-        .no-gps:hover { background-color: #ff6666; }
-        .no-gps:active { background-color: #e64444; }
-        
-        .active-blue { background-color: #007aff; }
-        .active-blue:hover { background-color: #3399ff; }
-        .active-blue:active { background-color: #0066cc; }
+        .no-gps { background-color: #ff4d4d; }
+        .no-gps:hover { background-color: #ff6666; }
+        .no-gps:active { background-color: #e64444; }
+        
+        .active-blue { background-color: #007aff; }
+        .active-blue:hover { background-color: #3399ff; }
+        .active-blue:active { background-color: #0066cc; }
 
-        #debug-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            background-color: transparent;
-            color: #ffffff;
-            padding: 10px;
-            border-radius: 5px;
-            z-index: 1000;
-            font-size: 14px;
-            line-height: 1.5;
-            width: 100%;
-            box-sizing: border-box;
-            pointer-events: none;
-            opacity: 0.9;
-            text-align: left;
-        }
-        .status-text {
-            margin: 0;
-        }
-        #debug-overlay #debugInfo {
-            margin-top: 5px;
-            line-height: 1.2;
-        }
-        /* NMEAログ表示エリアのスタイル */
-        #nmeaLog {
-            height: 30px; /* 1行が見える程度の高さに制限 */
-            overflow: hidden; /* スクロールを無効化 */
-            border: 1px solid #ccc; 
-            padding: 5px; 
-            font-size: 10px;
-            background-color: #000;
-            white-space: pre; /* 折り返しを無効化して1行表示を強調 */
-            pointer-events: all; 
-            line-height: 1;
-        }
-        
-        @media (max-width: 480px) {
-            #main-content {
-                flex-direction: column;
-                align-items: center;
-                gap: 20px;
-            }
-            #time-display-column, #lap-list-column {
-                width: 100%;
-                align-items: center;
-            }
-            #buttons-row {
-                flex-direction: row;
-                flex-wrap: wrap;
-                justify-content: center;
-                width: 100%;
-                align-items: center;
-            }
-            .button {
-                width: auto;
-                flex-grow: 1;
-                padding: 10px 8px;
-                font-size: 14px;
-            }
-            #display1 { font-size: 40px; }
-            #display { font-size: 25px; }
-            #lap_list div {
-                font-size: 1.6em;
-            }
-            #debug-overlay {
-                width: auto;
-            }
-            #nmeaLog {
-                /* モバイルでは少し大きく表示 */
-                font-size: 8px;
-            }
-        }
-    </style>
+        #debug-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: transparent;
+            color: #ffffff;
+            padding: 10px;
+            border-radius: 5px;
+            z-index: 1000;
+            font-size: 14px;
+            line-height: 1.5;
+            width: 100%;
+            box-sizing: border-box;
+            pointer-events: none;
+            opacity: 0.9;
+            text-align: left;
+        }
+        .status-text {
+            margin: 0;
+        }
+        #debug-overlay #debugInfo {
+            margin-top: 5px;
+            line-height: 1.2;
+        }
+        /* NMEAログ表示エリアのスタイル */
+        #nmeaLog {
+            height: 30px; /* 1行が見える程度の高さに制限 */
+            overflow: hidden; /* スクロールを無効化 */
+            border: 1px solid #ccc; 
+            padding: 5px; 
+            font-size: 10px;
+            background-color: #000;
+            white-space: pre; /* 折り返しを無効化して1行表示を強調 */
+            pointer-events: all; 
+            line-height: 1;
+        }
+        
+        @media (max-width: 480px) {
+            #main-content {
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            }
+            #time-display-column, #lap-list-column {
+                width: 100%;
+                align-items: center;
+            }
+            #buttons-row {
+                flex-direction: row;
+                flex-wrap: wrap;
+                justify-content: center;
+                width: 100%;
+                align-items: center;
+            }
+            .button {
+                width: auto;
+                flex-grow: 1;
+                padding: 10px 8px;
+                font-size: 14px;
+            }
+            #display1 { font-size: 40px; }
+            #display { font-size: 25px; }
+            #lap_list div {
+                font-size: 1.6em;
+            }
+            #debug-overlay {
+                width: auto;
+            }
+            #nmeaLog {
+                /* モバイルでは少し大きく表示 */
+                font-size: 8px;
+            }
+        }
+    </style>
 </head>
 
 <body>
 <div id="container">
-    <div id="debug-overlay">
-        <p id="status-display" class="status-text">GPS設定: 未取得</p>
-        <div id="debugInfo" class="status-text"></div>
-        <p class="status-text">NMEA Raw Data (Latest):</p>
-        <pre id="nmeaLog">No NMEA data yet...</pre>
-    </div>
-    
-    <div id="main-content">
-        <div id="time-display-column">
-            <div id='display1'>00:00.000</div>
-            <div id='display'>00:00:00.000</div>
-        </div>
-        <div id="lap-list-column">
-            <div id='lap_list'></div>
-        </div>
-    </div>
-    <div id="buttons-row">
-        <button id="start" class="button">start</button>
-        <button id="lap" class="button">lap</button>
-        <button id="reset" class="button">reset</button>
-        <button id="gpsButton" class="button no-gps">GPS</button>
-        <button id="getSettingsBtn" class="button no-setting">GET</button>
-    </div>
+    <div id="debug-overlay">
+        <p id="status-display" class="status-text">GPS設定: 未取得</p>
+        <div id="debugInfo" class="status-text"></div>
+        <p class="status-text">NMEA Raw Data (Latest):</p>
+        <pre id="nmeaLog">No NMEA data yet...</pre>
+    </div>
+    
+    <div id="main-content">
+        <div id="time-display-column">
+            <div id='display1'>00:00.000</div>
+            <div id='display'>00:00:00.000</div>
+        </div>
+        <div id="lap-list-column">
+            <div id='lap_list'></div>
+        </div>
+    </div>
+    <div id="buttons-row">
+        <button id="start" class="button">start</button>
+        <button id="lap" class="button">lap</button>
+        <button id="reset" class="button">reset</button>
+        <button id="gpsButton" class="button no-gps">GPS</button>
+        <button id="getSettingsBtn" class="button no-setting">GET</button>
+    </div>
 </div>
 
 <script>
@@ -257,17 +257,17 @@ let isSettingsLoaded = false;
 let lapFixedDisplayTimeoutId = null;
 
 const elem = {
-    display: null,
-    display1: null,
-    lap_list: null,
-    statusDisplay: null,
-    debugInfo: null,
-    startButton: null,
-    resetButton: null,
-    lapButton: null,
-    gpsButton: null,
-    getSettingsBtn: null,
-    nmeaLog: null 
+    display: null,
+    display1: null,
+    lap_list: null,
+    statusDisplay: null,
+    debugInfo: null,
+    startButton: null,
+    resetButton: null,
+    lapButton: null,
+    gpsButton: null,
+    getSettingsBtn: null,
+    nmeaLog: null 
 };
 
 // GPSラップ計測用変数 - localStorageから読み込む
@@ -278,198 +278,202 @@ let LAP_LINE_P2 = { lat: 0, lon: 0 };
 let device = null;
 let keepReading = true;
 let nmeaBuffer = '';
-const NMEA_VENDOR_ID = 0x1546;    
-const NMEA_PRODUCT_ID = 0x01A8;  
-// 💡 NMEAが表示され、接続が確定した設定値
-const IN_ENDPOINT = 2;            
+const NMEA_VENDOR_ID = 0x1546;    
+const NMEA_PRODUCT_ID = 0x01A8;   
+const IN_ENDPOINT = 2;            
 const INTERFACE_NUMBER = 1;
 
 // --- 更新レート/デバッグ表示用変数 ---
-let lastUpdateTime = 0; 
-let updateCounter = 0; 
-let displayRateTimer = null; 
-let currentUpdateRate = 0; 
+let lastUpdateTime = 0; 
+let updateCounter = 0; 
+let displayRateTimer = null; 
+let currentUpdateRate = 0; 
 let currentLat = 0.0;
 let currentLon = 0.0;
 
-// 💡 画面デバッグ用に追加した変数
+// 💡 RMCデバッグ用変数
 let latestRmcStatus = 'N/A';
 let latestRmcRawLatLon = 'N/A';
-// ------------------------------------
-// 💡 RMC更新レート計測用変数
 let rmcUpdateCounter = 0;
 let currentRmcUpdateRate = 0;
+
+// 💡 GGAデバッグ用変数 (新規追加)
+let ggaUpdateCounter = 0;
+let currentGgaUpdateRate = 0;
+let latestGgaStatus = 'N/A'; // Fix Quality
+let latestGgaRawLatLon = 'N/A';
 // ------------------------------------
+
 
 // --- ストップウォッチ関連の関数（省略） ---
 
 const totalTimePrint = (time) => {
-    let h = Math.floor(time / 3600000);
-    let m = Math.floor((time % 3600000) / 60000);
-    let s = Math.floor((time % 60000) / 1000);
-    let ms = Math.floor(time % 1000);
-    
-    h = ('0' + h).slice(-2);
-    m = ('0' + m).slice(-2);
-    s = ('0' + s).slice(-2);
-    ms = ('00' + ms).slice(-3);
-    
-    if (elem.display) elem.display.textContent = `${h}:${m}:${s}.${ms}`;
+    let h = Math.floor(time / 3600000);
+    let m = Math.floor((time % 3600000) / 60000);
+    let s = Math.floor((time % 60000) / 1000);
+    let ms = Math.floor(time % 1000);
+    
+    h = ('0' + h).slice(-2);
+    m = ('0' + m).slice(-2);
+    s = ('0' + s).slice(-2);
+    ms = ('00' + ms).slice(-3);
+    
+    if (elem.display) elem.display.textContent = `${h}:${m}:${s}.${ms}`;
 };
 
 const lapTimeToString = (time) => {
-    let m = Math.floor(time / 60000);
-    let s = Math.floor(time % 60000 / 1000);
-    let ms = Math.floor(time % 1000);
-    
-    m = ('0' + m).slice(-2);
-    s = ('0' + s).slice(-2);
-    ms = ('00' + ms).slice(-3);
-    
-    return `${m}:${s}.${ms}`;
+    let m = Math.floor(time / 60000);
+    let s = Math.floor(time % 60000 / 1000);
+    let ms = Math.floor(time % 1000);
+    
+    m = ('0' + m).slice(-2);
+    s = ('0' + s).slice(-2);
+    ms = ('00' + ms).slice(-3);
+    
+    return `${m}:${s}.${ms}`;
 };
 
 const countUp = () => {
-    countUpTimerId = requestAnimationFrame(() => {
-        const now = Date.now();
-        const elapsedTime = now - startTime;
-        totalTimePrint(elapsedTime);
-        countUp();
-    });
+    countUpTimerId = requestAnimationFrame(() => {
+        const now = Date.now();
+        const elapsedTime = now - startTime;
+        totalTimePrint(elapsedTime);
+        countUp();
+    });
 };
 
 const startRealtimeLap = () => {
-    if (swState === SW_STATE.RUN) {
-        lapTimerId = requestAnimationFrame(() => {
-            const now = Date.now();
-            const lapElapsedTime = now - lapStartTime;
-            const lapDisplay = lapTimeToString(lapElapsedTime);
-            if (elem.display1) elem.display1.textContent = lapDisplay;
-            startRealtimeLap();
-        });
-    }
+    if (swState === SW_STATE.RUN) {
+        lapTimerId = requestAnimationFrame(() => {
+            const now = Date.now();
+            const lapElapsedTime = now - lapStartTime;
+            const lapDisplay = lapTimeToString(lapElapsedTime);
+            if (elem.display1) elem.display1.textContent = lapDisplay;
+            startRealtimeLap();
+        });
+    }
 };
 
-const lapTimePrint = (time) => {    
-    const lapDuration = lapTimeToString(time);
-    const lapDiv = document.createElement('div');
-    lapDiv.textContent = `[${lapCount}] ${lapDuration}`;    
-    lapDiv.style.fontSize = '2.5em';
-    if (elem.lap_list) {
-        elem.lap_list.insertBefore(lapDiv, elem.lap_list.firstChild);
-    }
-    lapRecords.push({ count: lapCount, time: lapDuration });    
+const lapTimePrint = (time) => {     
+    const lapDuration = lapTimeToString(time);
+    const lapDiv = document.createElement('div');
+    lapDiv.textContent = `[${lapCount}] ${lapDuration}`;     
+    lapDiv.style.fontSize = '2.5em';
+    if (elem.lap_list) {
+        elem.lap_list.insertBefore(lapDiv, elem.lap_list.firstChild);
+    }
+    lapRecords.push({ count: lapCount, time: lapDuration });     
 };
 
 const updateButtonDisplay = () => {
-    if (elem.lapButton) {
-        elem.lapButton.style.display = (swState === SW_STATE.RUN) ? 'inline-block' : 'none';
-    }
-    if (elem.resetButton) {
-        elem.resetButton.style.display = (swState === SW_STATE.STOP || swState === SW_STATE.PAUSE) ? 'inline-block' : 'none';
-    }
-    if (elem.startButton) {
-        elem.startButton.textContent = (swState === SW_STATE.RUN) ? 'stop' : 'start';
-    }
+    if (elem.lapButton) {
+        elem.lapButton.style.display = (swState === SW_STATE.RUN) ? 'inline-block' : 'none';
+    }
+    if (elem.resetButton) {
+        elem.resetButton.style.display = (swState === SW_STATE.STOP || swState === SW_STATE.PAUSE) ? 'inline-block' : 'none';
+    }
+    if (elem.startButton) {
+        elem.startButton.textContent = (swState === SW_STATE.RUN) ? 'stop' : 'start';
+    }
 };
 
 const clickStartSW = () => {
-    if (!isSettingsLoaded && swState === SW_STATE.STOP) {
-        if (elem.debugInfo) {
-            elem.debugInfo.innerHTML = `GPS設定が未取得です。手動での計測を開始します。<br>${elem.debugInfo.innerHTML}`;
-        }
-    }
-    
-    if (swState === SW_STATE.STOP) {
-        swState = SW_STATE.RUN;
-        startTime = Date.now();
-        lapStartTime = Date.now();
-        lapCount = 0;
-        elem.lap_list.innerHTML = '';
-        countUp();
-        startRealtimeLap();
-    } else if (swState === SW_STATE.RUN) {
-        swState = SW_STATE.PAUSE;
-        cancelAnimationFrame(countUpTimerId);
-        cancelAnimationFrame(lapTimerId);
-        if (lapFixedDisplayTimeoutId) {
-            clearTimeout(lapFixedDisplayTimeoutId);
-        }
-    } else if (swState === SW_STATE.PAUSE) {
-        swState = SW_STATE.RUN;
-        const now = Date.now();
-        const pausedTime = now - lapStartTime;
-        startTime += pausedTime;
-        lapStartTime = now;
-        countUp();
-        startRealtimeLap();
-    }
-    updateButtonDisplay();
+    if (!isSettingsLoaded && swState === SW_STATE.STOP) {
+        if (elem.debugInfo) {
+            elem.debugInfo.innerHTML = `GPS設定が未取得です。手動での計測を開始します。<br>${elem.debugInfo.innerHTML}`;
+        }
+    }
+    
+    if (swState === SW_STATE.STOP) {
+        swState = SW_STATE.RUN;
+        startTime = Date.now();
+        lapStartTime = Date.now();
+        lapCount = 0;
+        elem.lap_list.innerHTML = '';
+        countUp();
+        startRealtimeLap();
+    } else if (swState === SW_STATE.RUN) {
+        swState = SW_STATE.PAUSE;
+        cancelAnimationFrame(countUpTimerId);
+        cancelAnimationFrame(lapTimerId);
+        if (lapFixedDisplayTimeoutId) {
+            clearTimeout(lapFixedDisplayTimeoutId);
+        }
+    } else if (swState === SW_STATE.PAUSE) {
+        swState = SW_STATE.RUN;
+        const now = Date.now();
+        const pausedTime = now - lapStartTime;
+        startTime += pausedTime;
+        lapStartTime = now;
+        countUp();
+        startRealtimeLap();
+    }
+    updateButtonDisplay();
 };
 
 const clickLapSW = () => {
-    if (swState === SW_STATE.RUN) {
-        lapCount++;
-        const now = Date.now();
-        const lapDuration = now - lapStartTime;
-        lapTimePrint(lapDuration);    
-        lapStartTime = now;
-        cancelAnimationFrame(lapTimerId);
-        startRealtimeLap();
-    }
+    if (swState === SW_STATE.RUN) {
+        lapCount++;
+        const now = Date.now();
+        const lapDuration = now - lapStartTime;
+        lapTimePrint(lapDuration);     
+        lapStartTime = now;
+        cancelAnimationFrame(lapTimerId);
+        startRealtimeLap();
+    }
 };
 
 const clickResetSW = () => {
-    swState = SW_STATE.STOP;
-    startTime = 0;
-    lapRecords = [];
-    lapCount = 0;
-    cancelAnimationFrame(countUpTimerId);
-    cancelAnimationFrame(lapTimerId);
-    if (lapFixedDisplayTimeoutId) {
-        clearTimeout(lapFixedDisplayTimeoutId);
-    }
-    totalTimePrint(0);
-    if (elem.lap_list) elem.lap_list.innerHTML = '';
-    if (elem.display1) elem.display1.textContent = '00:00.000';
-    updateButtonDisplay();
-    stopGps();
+    swState = SW_STATE.STOP;
+    startTime = 0;
+    lapRecords = [];
+    lapCount = 0;
+    cancelAnimationFrame(countUpTimerId);
+    cancelAnimationFrame(lapTimerId);
+    if (lapFixedDisplayTimeoutId) {
+        clearTimeout(lapFixedDisplayTimeoutId);
+    }
+    totalTimePrint(0);
+    if (elem.lap_list) elem.lap_list.innerHTML = '';
+    if (elem.display1) elem.display1.textContent = '00:00.000';
+    updateButtonDisplay();
+    stopGps();
 };
 
 const clickGpsButton = () => {
-    if (!isGpsRunning) {
-        startGps();
-    } else {
-        stopGps();
-    }
+    if (!isGpsRunning) {
+        startGps();
+    } else {
+        stopGps();
+    }
 };
 
 const getSettings = () => {
-    const p1Lat = localStorage.getItem('startLineP1Lat');
-    const p1Lon = localStorage.getItem('startLineP1Lon');
-    const p2Lat = localStorage.getItem('startLineP2Lat');
-    const p2Lon = localStorage.getItem('startLineP2Lon');
-    const threshold = localStorage.getItem('gpsThreshold');
-    const coolDown = localStorage.getItem('lapCoolDownTime');    
+    const p1Lat = localStorage.getItem('startLineP1Lat');
+    const p1Lon = localStorage.getItem('startLineP1Lon');
+    const p2Lat = localStorage.getItem('startLineP2Lat');
+    const p2Lon = localStorage.getItem('startLineP2Lon');
+    const threshold = localStorage.getItem('gpsThreshold');
+    const coolDown = localStorage.getItem('lapCoolDownTime');     
 
-    if (p1Lat && p1Lon && p2Lat && p2Lon) {
-        LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
-        LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
-        gpsThresholdValue = threshold ? parseFloat(threshold) : 20;
-        lapCoolDown = coolDown ? parseFloat(coolDown) : 15000;    
+    if (p1Lat && p1Lon && p2Lat && p2Lon) {
+        LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
+        LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
+        gpsThresholdValue = threshold ? parseFloat(threshold) : 20;
+        lapCoolDown = coolDown ? parseFloat(coolDown) : 15000;     
 
-        elem.statusDisplay.textContent = `GPS設定: OK (閾値: ${gpsThresholdValue}m / C/D: ${lapCoolDown / 1000}秒)`;
-        elem.debugInfo.innerHTML = "GPS設定が読み込まれました。";
-        isSettingsLoaded = true;
-        elem.getSettingsBtn.classList.remove('no-setting');
-        elem.getSettingsBtn.classList.add('active-blue');
-    } else {
-        elem.statusDisplay.textContent = 'GPS設定: 未設定（設定ツールで保存してください）';
-        elem.debugInfo.innerHTML = "localStorageにGPS設定が見つかりません。";
-        isSettingsLoaded = false;
-        elem.getSettingsBtn.classList.remove('active-blue');
-        elem.getSettingsBtn.classList.add('no-setting');
-    }
+        elem.statusDisplay.textContent = `GPS設定: OK (閾値: ${gpsThresholdValue}m / C/D: ${lapCoolDown / 1000}秒)`;
+        elem.debugInfo.innerHTML = "GPS設定が読み込まれました。";
+        isSettingsLoaded = true;
+        elem.getSettingsBtn.classList.remove('no-setting');
+        elem.getSettingsBtn.classList.add('active-blue');
+    } else {
+        elem.statusDisplay.textContent = 'GPS設定: 未設定（設定ツールで保存してください）';
+        elem.debugInfo.innerHTML = "localStorageにGPS設定が見つかりません。";
+        isSettingsLoaded = false;
+        elem.getSettingsBtn.classList.remove('active-blue');
+        elem.getSettingsBtn.classList.add('no-setting');
+    }
 };
 
 
@@ -479,457 +483,486 @@ const getSettings = () => {
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
 function dmsToDecimal(dmm, direction) {
-    if (!dmm) return NaN;
-    
-    const dotIndex = dmm.indexOf('.');
-    
-    if (dotIndex !== -1) {
-        // 💡 NMEA DMM形式では、「分」は常に小数点前の2桁と固定
-        const minuteStartIndex = dotIndex - 2;
-        
-        if (minuteStartIndex > 0) {
-            const degrees = parseInt(dmm.substring(0, minuteStartIndex));
-            const minutes = parseFloat(dmm.substring(minuteStartIndex));
-            
-            if (isNaN(degrees) || isNaN(minutes)) return NaN;
-            
-            let decimal = degrees + (minutes / 60);
+    if (!dmm) return NaN;
+    
+    const dotIndex = dmm.indexOf('.');
+    
+    if (dotIndex !== -1) {
+        // NMEA DMM形式では、「分」は常に小数点前の2桁と固定
+        const minuteStartIndex = dotIndex - 2;
+        
+        if (minuteStartIndex > 0) {
+            const degrees = parseInt(dmm.substring(0, minuteStartIndex));
+            const minutes = parseFloat(dmm.substring(minuteStartIndex));
+            
+            if (isNaN(degrees) || isNaN(minutes)) return NaN;
+            
+            let decimal = degrees + (minutes / 60);
 
-            if (direction === 'S' || direction === 'W') {
-                decimal = -decimal;
-            }
-            return decimal;
-        } else {
-            // 度数が存在しないなどの異常データ
-            return NaN;
-        }
+            if (direction === 'S' || direction === 'W') {
+                decimal = -decimal;
+            }
+            return decimal;
+        } else {
+            // 度数が存在しないなどの異常データ
+            return NaN;
+        }
 
-    } else {
-        // 小数点がない場合（古いデータ形式または解析失敗データ）の対応
-        const num = parseFloat(dmm);
-        if (isNaN(num)) return NaN;
-        
-        if (dmm.length >= 4) {
-            const minuteRaw = dmm.slice(-2);
-            const degreeRaw = dmm.slice(0, -2);
-            
-            const degrees = parseInt(degreeRaw);
-            const minutes = parseInt(minuteRaw);
-            
-            let decimal = degrees + (minutes / 60);
+    } else {
+        // 小数点がない場合（古いデータ形式または解析失敗データ）の対応
+        const num = parseFloat(dmm);
+        if (isNaN(num)) return NaN;
+        
+        if (dmm.length >= 4) {
+            const minuteRaw = dmm.slice(-2);
+            const degreeRaw = dmm.slice(0, -2);
+            
+            const degrees = parseInt(degreeRaw);
+            const minutes = parseInt(minuteRaw);
+            
+            let decimal = degrees + (minutes / 60);
 
-            if (direction === 'S' || direction === 'W') {
-                decimal = -decimal;
-            }
-            return decimal;
-        } else {
-            return NaN;
-        }
-    }
+            if (direction === 'S' || direction === 'W') {
+                decimal = -decimal;
+            }
+            return decimal;
+        } else {
+            return NaN;
+        }
+    }
 }
 
-// NMEAメッセージを解析し、位置情報オブジェクトを返す (簡略化されたパーサー)
+// NMEAメッセージを解析し、位置情報オブジェクトを返す
 function parseNmeaLine(line) {
-    const parts = line.split(',');
-    
-    // ----------------------------------------------------
-    // 💡 修正: NMEAヘッダーの末尾がRMCであれば、どのGNSSプレフィックスでも受け入れる
+    const parts = line.split(',');
+    
     // ----------------------------------------------------
-    if (parts[0].toUpperCase().endsWith('RMC') && parts.length >= 10 && parts[2] === 'A') {
-        const lat = dmsToDecimal(parts[3], parts[4]);
-        const lon = dmsToDecimal(parts[5], parts[6]); 
-        
-        const speedKnot = parseFloat(parts[7]) || 0;
-        const speedMps = speedKnot * 0.514444; // ノットをメートル/秒に変換
+    // 💡 RMCメッセージの判定と処理 (RMCレートのカウント)
+    // ----------------------------------------------------
+    if (parts[0].toUpperCase().endsWith('RMC') && parts.length >= 10) {
+        // RMCが解析成功し、かつ有効なFix ('A') のときのみ緯度経度を処理
+        if (parts[2] === 'A') {
+            const lat = dmsToDecimal(parts[3], parts[4]);
+            const lon = dmsToDecimal(parts[5], parts[6]); 
 
-        if (isNaN(lat) || isNaN(lon)) {
-            // 緯度経度が不正な場合は解析失敗
-            return null;
+            const speedKnot = parseFloat(parts[7]) || 0;
+            const speedMps = speedKnot * 0.514444; 
+
+            if (isNaN(lat) || isNaN(lon)) {
+                return null;
+            }
+            
+            // 💡 修正箇所: 有効なRMCメッセージが解析されたときのみカウント
+            rmcUpdateCounter++; 
+
+            return {
+                coords: {
+                    latitude: lat,
+                    longitude: lon,
+                    speed: speedMps, // m/s
+                    accuracy: 1
+                },
+                timestamp: Date.now() 
+            };
         }
+    } 
+    
+    // ----------------------------------------------------
+    // 💡 GNGGAメッセージの判定と処理 (GGAレートのカウント)
+    // ----------------------------------------------------
+    else if (parts[0].toUpperCase().endsWith('GGA') && parts.length >= 7) {
+        ggaUpdateCounter++; // ★ GGAメッセージが来たらカウント
         
-        // ----------------------------------------------------
-        // 💡 修正箇所: 有効なRMCメッセージが解析されたときのみカウント
-        // ----------------------------------------------------
-        rmcUpdateCounter++;
+        // GGAステータスを取得 (parts[6] - Fix Quality: 0=No Fix, 1=GPS Fix, 2=DGPS Fix, etc.)
+        const fixQuality = parseInt(parts[6]);
+        latestGgaStatus = fixQuality > 0 ? `FIX(${fixQuality})` : 'NO FIX';
+        
+        // GGA生の緯度経度をデバッグ用に取得 (RMCとフォーマットが異なる場合があるため分離)
+        const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
+        const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
+        latestGgaRawLatLon = `${rawLat} / ${rawLon}`;
+        
+        // GGAからは測位情報を返さない（RMCを優先するため）
+        return null;
+    }
 
-        return {
-            coords: {
-                latitude: lat,
-                longitude: lon,
-                speed: speedMps, // m/s
-                accuracy: 1
-            },
-            timestamp: Date.now() 
-        };
-    }
-    return null;
+    return null;
 }
 
 // NMEAデータ処理バッファを管理し、行ごとにパーサーに渡す
 function processNmeaData(data) {
-    nmeaBuffer += data;
-    let newlineIndex;
+    nmeaBuffer += data;
+    let newlineIndex;
 
-    while ((newlineIndex = nmeaBuffer.indexOf('\n')) !== -1) {
-        const line = nmeaBuffer.substring(0, newlineIndex).trim();
-        nmeaBuffer = nmeaBuffer.substring(newlineIndex + 1);
+    while ((newlineIndex = nmeaBuffer.indexOf('\n')) !== -1) {
+        const line = nmeaBuffer.substring(0, newlineIndex).trim();
+        nmeaBuffer = nmeaBuffer.substring(newlineIndex + 1);
 
-        if (line.startsWith('$') && line.length > 5) {
-            const position = parseNmeaLine(line); // parseNmeaLine内でrmcUpdateCounter++が行われる
-            
-            // RMCメッセージに関するデバッグ情報を更新
-            if (line.toUpperCase().includes('RMC')) { 
-                 try {
-                     const parts = line.split(',');
-                     
-                     // 1. 小数点以下6桁のデシマル緯度・経度を更新 (画面上部表示用)
-                     currentLat = dmsToDecimal(parts[3], parts[4]);
-                     currentLon = dmsToDecimal(parts[5], parts[6]);
+        if (line.startsWith('$') && line.length > 5) {
+            const position = parseNmeaLine(line); 
+            
+            // RMCメッセージに関するデバッグ情報を更新
+            if (line.toUpperCase().includes('RMC')) { 
+                try {
+                    const parts = line.split(',');
+                    
+                    // 1. 小数点以下6桁のデシマル緯度・経度を更新 (画面上部表示用)
+                    currentLat = dmsToDecimal(parts[3], parts[4]);
+                    currentLon = dmsToDecimal(parts[5], parts[6]);
 
-                     // 2. RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
-                     latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
-                     const rawLat = parts.length > 3 ? `${parts[3]} ${parts[4]}` : 'N/A';
-                     const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
-                     latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
-                     
-                     // ----------------------------------------------------
-                     // 💡 削除: rmcUpdateCounter++; // parseNmeaLineに移動した
-                     // ----------------------------------------------------
-                     
-                 } catch (e) {
-                     console.error("RMC line parse error:", e, "Line:", line);
-                 }
-             }
-            
-            // onWebUsbPositionUpdateの呼び出しは position が有効な場合 ('A' ステータス) のみ
-            if (position && swState === SW_STATE.RUN) {
-                onWebUsbPositionUpdate(position); 
-            }
-        }
-    }
+                    // 2. RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
+                    latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
+                    const rawLat = parts.length > 3 ? `${parts[3]} ${parts[4]}` : 'N/A';
+                    const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
+                    latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
+                    
+                } catch (e) {
+                    console.error("RMC line parse error:", e, "Line:", line);
+                }
+            }
+            
+            if (position && swState === SW_STATE.RUN) {
+                onWebUsbPositionUpdate(position); 
+            }
+        }
+    }
 }
 
 // 1秒ごとに更新レートを計算して表示するタイマーを開始
 function startRateMeasurement() {
-    if (displayRateTimer !== null) {
-        clearInterval(displayRateTimer);
-        displayRateTimer = null;
-    }
-    
-    currentUpdateRate = 0;
-    updateCounter = 0; 
-    // 💡 RMCレート計測用のカウンターもリセット
-    currentRmcUpdateRate = 0;
-    rmcUpdateCounter = 0;
-    
-    displayRateTimer = setInterval(() => {
-        currentUpdateRate = updateCounter; 
-        updateCounter = 0; 
-        // 💡 RMCレート計測の計算
-        currentRmcUpdateRate = rmcUpdateCounter;
-        rmcUpdateCounter = 0; // カウンターをリセット
-        
-        updateDebugDisplay(); 
-    }, 1000); 
+    if (displayRateTimer !== null) {
+        clearInterval(displayRateTimer);
+        displayRateTimer = null;
+    }
+    
+    currentUpdateRate = 0;
+    updateCounter = 0; 
+    // 💡 RMCレート、GGAレート計測用のカウンターをリセット
+    currentRmcUpdateRate = 0;
+    rmcUpdateCounter = 0;
+    currentGgaUpdateRate = 0;
+    ggaUpdateCounter = 0;
+    
+    displayRateTimer = setInterval(() => {
+        currentUpdateRate = updateCounter; 
+        updateCounter = 0; 
+        
+        // 💡 RMCレート計測の計算
+        currentRmcUpdateRate = rmcUpdateCounter;
+        rmcUpdateCounter = 0; // カウンターをリセット
+        
+        // 💡 GGAレート計測の計算
+        currentGgaUpdateRate = ggaUpdateCounter;
+        ggaUpdateCounter = 0; // カウンターをリセット
+        
+        updateDebugDisplay(); 
+    }, 1000); 
 }
 
 // 更新レートの計測を停止
 function stopRateMeasurement() {
-    if (displayRateTimer !== null) {
-        clearInterval(displayRateTimer);
-        displayRateTimer = null; 
-    }
-    currentUpdateRate = 0;
-    currentRmcUpdateRate = 0; // 💡 RMCレートもリセット
+    if (displayRateTimer !== null) {
+        clearInterval(displayRateTimer);
+        displayRateTimer = null; 
+    }
+    currentUpdateRate = 0;
+    currentRmcUpdateRate = 0; 
+    currentGgaUpdateRate = 0;
 }
 
 // デバッグ表示を更新する関数
 function updateDebugDisplay() {
-    if (!elem.debugInfo) return;
+    if (!elem.debugInfo) return;
 
-    // 💡 表示を修正: NMEA総レートとRMCレートを分けて表示
-    const rateText = `総レート: ${currentUpdateRate.toFixed(0)} Hz | RMCレート: ${currentRmcUpdateRate.toFixed(0)} Hz`;
-    
-    // 💡 小数点6桁のデシマル表示
-    const latLonText = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
+    // 💡 表示を修正: NMEA総レート、RMCレート、GGAレートを分けて表示
+    const rateText = `総レート: ${currentUpdateRate.toFixed(0)} Hz | RMCレート: ${currentRmcUpdateRate.toFixed(0)} Hz | GGAレート: ${currentGgaUpdateRate.toFixed(0)} Hz`;
+    
+    // 💡 RMCステータスとGGAステータスを表示
+    const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
+    const ggaStatusText = `GGA Status: ${latestGgaStatus}`;
+    
+    // 💡 小数点6桁のデシマル表示
+    const latLonText = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
 
-    // 💡 RMCステータスと生の緯度経度を表示
-    const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
-    const rmcRawText = `RAW DMM: ${latestRmcRawLatLon}`;
-    
-    const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
-    const lapCountText = `周回数: ${lapCount}`; 
+    // 💡 RMC生の緯度経度を表示
+    const rmcRawText = `RAW DMM: ${latestRmcRawLatLon}`;
+    
+    const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
+    const lapCountText = `周回数: ${lapCount}`; 
 
-    elem.debugInfo.innerHTML = `
-        ${rateText} | ${rmcStatusText}<br>
-        ${latLonText}<br>
-        ${rmcRawText}<br>
-        ${speedText} | ${lapCountText}
-    `;
-    
-    // RMCステータスに応じて色を付ける (A=緑, V=赤)
-    const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
-    elem.debugInfo.style.color = statusColor;
+    elem.debugInfo.innerHTML = `
+        ${rateText}<br>
+        ${rmcStatusText} | ${ggaStatusText}<br>
+        ${latLonText}<br>
+        ${rmcRawText}<br>
+        ${speedText} | ${lapCountText}
+    `;
+    
+    // RMCステータスに応じて色を付ける (A=緑, V=赤)
+    const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
+    elem.debugInfo.style.color = statusColor;
 }
 
 // WebUSBデータ読み取りループ
 async function readLoop() {
-    const nmeaLogElement = elem.nmeaLog; 
-    
-    while (device && keepReading) {
-        try {
-            const result = await device.transferIn(IN_ENDPOINT, 512); 
-            if (result.status === 'ok' && result.data) {
-                const decoder = new TextDecoder('iso-8859-1');
-                const nmeaData = decoder.decode(result.data);
-                
-                updateCounter++;
+    const nmeaLogElement = elem.nmeaLog; 
+    
+    while (device && keepReading) {
+        try {
+            const result = await device.transferIn(IN_ENDPOINT, 512); 
+            if (result.status === 'ok' && result.data) {
+                const decoder = new TextDecoder('iso-8859-1');
+                const nmeaData = decoder.decode(result.data);
+                
+                updateCounter++;
 
-                if (nmeaLogElement && nmeaData.length > 0) {
-                    const lines = nmeaData.trim().split('\n');
-                    if (lines.length > 0) {
-                        const latestLine = lines[lines.length - 1].trim(); 
-                        nmeaLogElement.textContent = latestLine; 
-                    }
-                }
-                
-                processNmeaData(nmeaData); 
-            }
-        } catch (error) {
-            if (keepReading) {
-                elem.debugInfo.innerHTML = `USB読み取りエラー: ${error.message}`;
-            }
-            break; 
-        }
-    }
+                if (nmeaLogElement && nmeaData.length > 0) {
+                    const lines = nmeaData.trim().split('\n');
+                    if (lines.length > 0) {
+                        const latestLine = lines[lines.length - 1].trim(); 
+                        nmeaLogElement.textContent = latestLine; 
+                    }
+                }
+                
+                processNmeaData(nmeaData); 
+            }
+        } catch (error) {
+            if (keepReading) {
+                elem.debugInfo.innerHTML = `USB読み取りエラー: ${error.message}`;
+            }
+            break; 
+        }
+    }
 }
 
 // WebUSB接続を開始
 async function startWebUsbGps() {
-    try {
-        elem.statusDisplay.textContent = 'USBデバイスを検索中...';
-        elem.gpsButton.textContent = '接続中...'; 
+    try {
+        elem.statusDisplay.textContent = 'USBデバイスを検索中...';
+        elem.gpsButton.textContent = '接続中...'; 
 
-        device = await navigator.usb.requestDevice({
-            filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }]
-        });
-        
-        await device.open();
-        
-        if (device.configuration === null) {
-            await device.selectConfiguration(device.configurations[0].configurationValue);
-        }
-        
-        await device.claimInterface(INTERFACE_NUMBER);
-        
-        elem.statusDisplay.textContent = 'GPSモジュール接続完了。データ監視中...';
-        elem.gpsButton.textContent = 'GPS (停止)';
-        elem.gpsButton.classList.remove('no-gps');
-        elem.gpsButton.classList.add('active-blue');
-        isGpsRunning = true;
-        keepReading = true;
-        
-        startRateMeasurement(); 
-        readLoop(); 
-        
-    } catch (error) {
-        elem.debugInfo.innerHTML = `USB接続エラー: ${error.message}`;
-        stopGps();
-    }
+        device = await navigator.usb.requestDevice({
+            filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }]
+        });
+        
+        await device.open();
+        
+        if (device.configuration === null) {
+            await device.selectConfiguration(device.configurations[0].configurationValue);
+        }
+        
+        await device.claimInterface(INTERFACE_NUMBER);
+        
+        elem.statusDisplay.textContent = 'GPSモジュール接続完了。データ監視中...';
+        elem.gpsButton.textContent = 'GPS (停止)';
+        elem.gpsButton.classList.remove('no-gps');
+        elem.gpsButton.classList.add('active-blue');
+        isGpsRunning = true;
+        keepReading = true;
+        
+        startRateMeasurement(); 
+        readLoop(); 
+        
+    } catch (error) {
+        elem.debugInfo.innerHTML = `USB接続エラー: ${error.message}`;
+        stopGps();
+    }
 }
 
 // GPS監視を開始する
 function startGps() {
-    if (!isSettingsLoaded) {
-        elem.debugInfo.innerHTML = "GPS設定が読み込まれていません。<br>GETボタンを押して設定を読み込んでください。";
-        return;
-    }
-    startWebUsbGps();
+    if (!isSettingsLoaded) {
+        elem.debugInfo.innerHTML = "GPS設定が読み込まれていません。<br>GETボタンを押して設定を読み込んでください。";
+        return;
+    }
+    startWebUsbGps();
 }
 
 // GPS監視を停止する
 async function stopGps() {
-    stopRateMeasurement(); 
+    stopRateMeasurement(); 
 
-    keepReading = false;
-    if (device) {
-        try {
-            await device.releaseInterface(INTERFACE_NUMBER);
-            await device.close();
-        } catch (error) {
-            // エラーは無視
-        }
-        device = null;
-    }
-    isGpsRunning = false;
-    elem.statusDisplay.textContent = 'GPS監視停止';
-    elem.gpsButton.textContent = 'GPS';
-    elem.gpsButton.classList.remove('active-blue');
-    elem.gpsButton.classList.add('no-gps');
-    
-    if(elem.nmeaLog) elem.nmeaLog.textContent = 'No NMEA data yet...';
-    currentLat = 0.0;
-    currentLon = 0.0;
-    latestRmcStatus = 'N/A';
-    latestRmcRawLatLon = 'N/A';
-    lastPosition = null;
-    updateDebugDisplay();
+    keepReading = false;
+    if (device) {
+        try {
+            await device.releaseInterface(INTERFACE_NUMBER);
+            await device.close();
+        } catch (error) {
+            // エラーは無視
+        }
+        device = null;
+    }
+    isGpsRunning = false;
+    elem.statusDisplay.textContent = 'GPS監視停止';
+    elem.gpsButton.textContent = 'GPS';
+    elem.gpsButton.classList.remove('active-blue');
+    elem.gpsButton.classList.add('no-gps');
+    
+    if(elem.nmeaLog) elem.nmeaLog.textContent = 'No NMEA data yet...';
+    currentLat = 0.0;
+    currentLon = 0.0;
+    latestRmcStatus = 'N/A';
+    latestRmcRawLatLon = 'N/A';
+    latestGgaStatus = 'N/A'; // 💡 リセット
+    latestGgaRawLatLon = 'N/A'; // 💡 リセット
+    lastPosition = null;
+    updateDebugDisplay();
 }
 
 // WebUSBからの位置情報更新処理（省略）
 function onWebUsbPositionUpdate(position) {
-    if (swState !== SW_STATE.RUN || !isGpsRunning) {
-        return;
-    }
-    
-    lastUpdateTime = Date.now();
-    
-    const currentLat = position.coords.latitude;
-    const currentLon = position.coords.longitude;
-    const currentTime = Date.now();
-    
-    // ヘルパー関数群（省略）
-    const calculateDistance = (lat1, lon1, lat2, lon2) => {
-        const R = 6371e3;
-        const φ1 = lat1 * Math.PI / 180;
-        const φ2 = lat2 * Math.PI / 180;
-        const Δφ = (lat2 - lat1) * Math.PI / 180;
-        const Δλ = (lon2 - lon1) * Math.PI / 180;
-        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    };
-    
-    const calculatePerpendicularFootApprox = (lineLat1, lineLon1, lineLat2, lineLon2, pointLat, pointLon) => {
-        const dx = lineLon2 - lineLon1;
-        const dy = lineLat2 - lineLat1;
-        const lineLenSq = dx * dx + dy * dy;
-        if (lineLenSq < 1e-9) return { latitude: lineLat1, longitude: lineLon1 };
-        const t = ((pointLon - lineLon1) * dx + (pointLat - lineLat1) * dy) / lineLenSq;
-        if (t < 0) return { latitude: lineLat1, longitude: lineLon1 };
-        if (t > 1) return { latitude: lineLat2, longitude: lineLon2 };
-        return { latitude: lineLat1 + t * dy, longitude: lineLon1 + t * dx };
-    };
-    
-    const getSideOfLine = (pointLat, pointLon, lineLat1, lineLon1, lineLat2, lineLon2) => {
-        return (lineLon2 - lineLon1) * (pointLat - lineLat1) - (lineLat2 - lineLat1) * (pointLon - lineLon1);
-    };
+    if (swState !== SW_STATE.RUN || !isGpsRunning) {
+        return;
+    }
+    
+    lastUpdateTime = Date.now();
+    
+    const currentLat = position.coords.latitude;
+    const currentLon = position.coords.longitude;
+    const currentTime = Date.now();
+    
+    // ヘルパー関数群（省略）
+    const calculateDistance = (lat1, lon1, lat2, lon2) => {
+        const R = 6371e3;
+        const φ1 = lat1 * Math.PI / 180;
+        const φ2 = lat2 * Math.PI / 180;
+        const Δφ = (lat2 - lat1) * Math.PI / 180;
+        const Δλ = (lon2 - lon1) * Math.PI / 180;
+        const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) + Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    };
+    
+    const calculatePerpendicularFootApprox = (lineLat1, lineLon1, lineLat2, lineLon2, pointLat, pointLon) => {
+        const dx = lineLon2 - lineLon1;
+        const dy = lineLat2 - lineLat1;
+        const lineLenSq = dx * dx + dy * dy;
+        if (lineLenSq < 1e-9) return { latitude: lineLat1, longitude: lineLon1 };
+        const t = ((pointLon - lineLon1) * dx + (pointLat - lineLat1) * dy) / lineLenSq;
+        if (t < 0) return { latitude: lineLat1, longitude: lineLon1 };
+        if (t > 1) return { latitude: lineLat2, longitude: lineLon2 };
+        return { latitude: lineLat1 + t * dy, longitude: lineLon1 + t * dx };
+    };
+    
+    const getSideOfLine = (pointLat, pointLon, lineLat1, lineLon1, lineLat2, lineLon2) => {
+        return (lineLon2 - lineLon1) * (pointLat - lineLat1) - (lineLat2 - lineLat1) * (pointLon - lineLon1);
+    };
 
-    const getIntersectionTime = (p1, p2, l1, l2, l3, l4) => {
-        const A = (l4 - l2) * (p2.lon - p1.lon) - (l3 - l1) * (p2.lat - p1.lat);
-        if (A === 0) return null;
-        const B = (l3 - l1) * (p1.lat - l2) - (l4 - l2) * (p1.lon - l1);
-        const ratio = B / A;
-        if (ratio < 0 || ratio > 1) return null;
-        return p1.time + (p2.time - p1.time) * ratio;
-    };
+    const getIntersectionTime = (p1, p2, l1, l2, l3, l4) => {
+        const A = (l4 - l2) * (p2.lon - p1.lon) - (l3 - l1) * (p2.lat - p1.lat);
+        if (A === 0) return null;
+        const B = (l3 - l1) * (p1.lat - l2) - (l4 - l2) * (p1.lon - l1);
+        const ratio = B / A;
+        if (ratio < 0 || ratio > 1) return null;
+        return p1.time + (p2.time - p1.time) * ratio;
+    };
 
-    if (!lastPosition) {
-        lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
-        previousSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
-        return;
-    }
+    if (!lastPosition) {
+        lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
+        previousSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+        return;
+    }
 
-    const currentSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
-    const isCrossingLine = (previousSideOfLine > 0 && currentSideOfLine < 0) || (previousSideOfLine < 0 && currentSideOfLine > 0);
-    const timeSinceLastLap = currentTime - lastLapTime;
-    const isCoolDownOver = (lapCount === 0) || (timeSinceLastLap >= lapCoolDown);
+    const currentSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+    const isCrossingLine = (previousSideOfLine > 0 && currentSideOfLine < 0) || (previousSideOfLine < 0 && currentSideOfLine > 0);
+    const timeSinceLastLap = currentTime - lastLapTime;
+    const isCoolDownOver = (lapCount === 0) || (timeSinceLastLap >= lapCoolDown);
 
-    const P = calculatePerpendicularFootApprox(LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon, currentLat, currentLon);
-    const distanceToStartLine = calculateDistance(currentLat, currentLon, P.latitude, P.longitude);
-    const isNearStartLine = distanceToStartLine <= gpsThresholdValue;
+    const P = calculatePerpendicularFootApprox(LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon, currentLat, currentLon);
+    const distanceToStartLine = calculateDistance(currentLat, currentLon, P.latitude, P.longitude);
+    const isNearStartLine = distanceToStartLine <= gpsThresholdValue;
 
-    if (isCrossingLine && isCoolDownOver && isNearStartLine) {
-        
-        const timeDelta = currentTime - lastPosition.time;
-        const speed = position.coords.speed || 0; 
-        const distanceMoved = speed * timeDelta / 1000; 
-        
-        const deltaLat = currentLat - lastPosition.lat;
-        const deltaLon = currentLon - lastPosition.lon;
-        const currentToLastDistance = calculateDistance(currentLat, currentLon, lastPosition.lat, lastPosition.lon);
+    if (isCrossingLine && isCoolDownOver && isNearStartLine) {
+        
+        const timeDelta = currentTime - lastPosition.time;
+        const speed = position.coords.speed || 0; 
+        const distanceMoved = speed * timeDelta / 1000; 
+        
+        const deltaLat = currentLat - lastPosition.lat;
+        const deltaLon = currentLon - lastPosition.lon;
+        const currentToLastDistance = calculateDistance(currentLat, currentLon, lastPosition.lat, lastPosition.lon);
 
-        let predictedLat, predictedLon;
-        if (currentToLastDistance > 0) {
-            const ratio = distanceMoved / currentToLastDistance;
-            predictedLat = currentLat + deltaLat * ratio;
-            predictedLon = currentLon + deltaLon * ratio;
-        } else {
-            predictedLat = currentLat;
-            predictedLon = currentLon;
-        }
+        let predictedLat, predictedLon;
+        if (currentToLastDistance > 0) {
+            const ratio = distanceMoved / currentToLastDistance;
+            predictedLat = currentLat + deltaLat * ratio;
+            predictedLon = currentLon + deltaLon * ratio;
+        } else {
+            predictedLat = currentLat;
+            predictedLon = currentLon;
+        }
 
-        const predictedPosition = {
-            lat: predictedLat,
-            lon: predictedLon,
-            time: currentTime + timeDelta
-        };
+        const predictedPosition = {
+            lat: predictedLat,
+            lon: predictedLon,
+            time: currentTime + timeDelta
+        };
 
-        const estimatedCrossingTime = getIntersectionTime(lastPosition, predictedPosition, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
-        
-        let lapTimeBase;
-        if (estimatedCrossingTime && Math.abs(estimatedCrossingTime - currentTime) < 10000) {
-            lapTimeBase = estimatedCrossingTime;
-        } else {
-            lapTimeBase = currentTime;
-        }
+        const estimatedCrossingTime = getIntersectionTime(lastPosition, predictedPosition, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+        
+        let lapTimeBase;
+        if (estimatedCrossingTime && Math.abs(estimatedCrossingTime - currentTime) < 10000) {
+            lapTimeBase = estimatedCrossingTime;
+        } else {
+            lapTimeBase = currentTime;
+        }
 
-        lapCount++;
-        const lapDuration = lapTimeBase - lapStartTime;
-        lapTimePrint(lapDuration);    
-        
-        cancelAnimationFrame(lapTimerId);
-        if (elem.display1) elem.display1.textContent = lapTimeToString(lapDuration);
+        lapCount++;
+        const lapDuration = lapTimeBase - lapStartTime;
+        lapTimePrint(lapDuration);     
+        
+        cancelAnimationFrame(lapTimerId);
+        if (elem.display1) elem.display1.textContent = lapTimeToString(lapDuration);
 
-        if (lapFixedDisplayTimeoutId) {
-             clearTimeout(lapFixedDisplayTimeoutId);
-        }
-        lapFixedDisplayTimeoutId = setTimeout(() => {
-            if (swState === SW_STATE.RUN) {
-                lapStartTime = lapTimeBase;
-                startRealtimeLap();
-            }
-        }, 10000);
-        
-        lastLapTime = lapTimeBase;
-    }
+        if (lapFixedDisplayTimeoutId) {
+            clearTimeout(lapFixedDisplayTimeoutId);
+        }
+        lapFixedDisplayTimeoutId = setTimeout(() => {
+            if (swState === SW_STATE.RUN) {
+                lapStartTime = lapTimeBase;
+                startRealtimeLap();
+            }
+        }, 10000);
+        
+        lastLapTime = lapTimeBase;
+    }
 
-    lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
-    previousSideOfLine = currentSideOfLine;
+    lastPosition = { lat: currentLat, lon: currentLon, time: currentTime, speed: position.coords.speed };
+    previousSideOfLine = currentSideOfLine;
 }
 
 window.addEventListener('load', () => {
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/service-worker.js')
-            .then(registration => {
-            })
-            .catch(error => {
-            });
-    }
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/service-worker.js')
+            .then(registration => {
+            })
+            .catch(error => {
+            });
+    }
 
-    elem.display = document.getElementById('display');
-    elem.display1 = document.getElementById('display1');
-    elem.lap_list = document.getElementById('lap_list');
-    elem.statusDisplay = document.getElementById('status-display');
-    elem.debugInfo = document.getElementById('debugInfo');
-    elem.startButton = document.getElementById('start');
-    elem.resetButton = document.getElementById('reset');
-    elem.lapButton = document.getElementById('lap');
-    elem.gpsButton = document.getElementById('gpsButton');
-    elem.getSettingsBtn = document.getElementById('getSettingsBtn');
-    elem.nmeaLog = document.getElementById('nmeaLog'); 
+    elem.display = document.getElementById('display');
+    elem.display1 = document.getElementById('display1');
+    elem.lap_list = document.getElementById('lap_list');
+    elem.statusDisplay = document.getElementById('status-display');
+    elem.debugInfo = document.getElementById('debugInfo');
+    elem.startButton = document.getElementById('start');
+    elem.resetButton = document.getElementById('reset');
+    elem.lapButton = document.getElementById('lap');
+    elem.gpsButton = document.getElementById('gpsButton');
+    elem.getSettingsBtn = document.getElementById('getSettingsBtn');
+    elem.nmeaLog = document.getElementById('nmeaLog'); 
 
-    if (elem.startButton) elem.startButton.addEventListener('click', clickStartSW);
-    if (elem.lapButton) elem.lapButton.addEventListener('click', clickLapSW);
-    if (elem.resetButton) elem.resetButton.addEventListener('click', clickResetSW);
-    if (elem.gpsButton) elem.gpsButton.addEventListener('click', clickGpsButton);
-    if (elem.getSettingsBtn) elem.getSettingsBtn.addEventListener('click', getSettings);
-    
-    updateButtonDisplay();
-    totalTimePrint(0);
-    if (elem.display1) elem.display1.textContent = '00:00.000';
-    getSettings();
-    updateDebugDisplay();
+    if (elem.startButton) elem.startButton.addEventListener('click', clickStartSW);
+    if (elem.lapButton) elem.lapButton.addEventListener('click', clickLapSW);
+    if (elem.resetButton) elem.resetButton.addEventListener('click', clickResetSW);
+    if (elem.gpsButton) elem.gpsButton.addEventListener('click', clickGpsButton);
+    if (elem.getSettingsBtn) elem.getSettingsBtn.addEventListener('click', getSettings);
+    
+    updateButtonDisplay();
+    totalTimePrint(0);
+    if (elem.display1) elem.display1.textContent = '00:00.000';
+    getSettings();
+    updateDebugDisplay();
 });
 </script>
 </body>
