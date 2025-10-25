@@ -286,7 +286,7 @@ let nmeaBuffer = '';
 const NMEA_VENDOR_ID = 0x1546;    
 const NMEA_PRODUCT_ID = 0x01A8;  
 const IN_ENDPOINT = 2;           
-const OUT_ENDPOINT = 2; // 💡 OUTエンドポイントを追加
+const OUT_ENDPOINT = 1; // 💡 OUTエンドポイントを追加
 const INTERFACE_NUMBER = 1;
 
 // --- 更新レート/デバッグ表示用変数 ---
@@ -945,7 +945,7 @@ window.addEventListener('load', () => {
     if (elem.resetButton) elem.resetButton.addEventListener('click', clickResetSW);
     if (elem.gpsButton) elem.gpsButton.addEventListener('click', clickGpsButton);
     if (elem.getSettingsBtn) elem.getSettingsBtn.addEventListener('click', getSettings);
-    // if (elem.set10HzButton) elem.set10HzButton.addEventListener('click', sendUblox10HzConfig);// 💡 イベントリスナー設定
+    if (elem.set10HzButton) elem.set10HzButton.addEventListener('click', sendUblox10HzConfig);// 💡 イベントリスナー設定
     
     updateButtonDisplay();
     totalTimePrint(0);
@@ -957,5 +957,6 @@ window.addEventListener('load', () => {
 </body>
 
 </html>
+
 
 
