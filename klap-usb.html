@@ -292,6 +292,9 @@ let currentUpdateRate = 0;
 let currentLat = 0.0;
 let currentLon = 0.0;
 
+// 💡 画面デバッグ用に追加した変数
+let latestRmcStatus = 'N/A';
+let latestRmcRawLatLon = 'N/A';
 
 // --- ストップウォッチ関連の関数（変更なし） ---
 
@@ -370,7 +373,7 @@ const clickStartSW = () => {
     
     if (!isSettingsLoaded && swState === SW_STATE.STOP) {
         if (elem.debugInfo) {
-            elem.debugInfo.textContent = "GPS設定が未取得です。手動での計測を開始します。";
+            elem.debugInfo.innerHTML = `GPS設定が未取得です。手動での計測を開始します。<br>${elem.debugInfo.innerHTML}`;
         }
     }
     
@@ -528,23 +531,20 @@ function processNmeaData(data) {
         if (line.startsWith('$') && line.length > 5) {
             const position = parseNmeaLine(line);
             
-            // 💡 修正点: 全てのRMCセンテンスから緯度経度を抽出し、デバッグログを出力
+            // 💡 修正点: 全てのRMCセンテンスから緯度経度を抽出し、デバッグ表示用の変数を更新
             if (line.includes('RMC')) {
                  try {
                      const parts = line.split(',');
                      // parts[3]とparts[5]が緯度経度、parts[4]とparts[6]がN/S/E/W
                      // RMCステータス ('A' or 'V') にかかわらず、デバッグ表示用に緯度経度を更新
+                     
+                     // 1. 小数点以下6桁のデシマル緯度・経度を更新 (画面上部表示用)
                      currentLat = dmsToDecimal(parts[3], parts[4]);
                      currentLon = dmsToDecimal(parts[5], parts[6]);
-                     
-                     // 🚨 デバッグログの追加 🚨
-                     if (!isNaN(currentLat) && !isNaN(currentLon)) {
-                        const status = parts.length > 2 ? parts[2] : 'N/A';
-                        console.log(`RMC Data: Status=${status}, Lat=${currentLat.toFixed(6)}, Lon=${currentLon.toFixed(6)}`);
-                     } else {
-                        console.log(`RMC Data: Status=${parts.length > 2 ? parts[2] : 'N/A'}, Lat/Lon parse failed`);
-                     }
-                     // 🚨 デバッグログ終了 🚨
+
+                     // 2. RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
+                     latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
+                     latestRmcRawLatLon = `${parts[3]} ${parts[4]} / ${parts[5]} ${parts[6]}`;
                      
                  } catch (e) {
                      console.error("RMC line parse error:", e, "Line:", line);
@@ -599,17 +599,27 @@ function updateDebugDisplay() {
     if (!elem.debugInfo) return;
 
     const rateText = `レート: ${currentUpdateRate.toFixed(0)} Hz`;
-    const latLonText = `緯度: ${currentLat.toFixed(6)} / 経度: ${currentLon.toFixed(6)}`;
-    const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
+    
+    // 💡 小数点6桁のデシマル表示
+    const latLonText = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
 
+    // 💡 RMCステータスと生の緯度経度を表示
+    const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
+    const rmcRawText = `RAW DMM: ${latestRmcRawLatLon}`;
+    
+    const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
     const lapCountText = `周回数: ${lapCount}`; 
 
     elem.debugInfo.innerHTML = `
-        ${rateText}<br>
+        ${rateText} | ${rmcStatusText}<br>
         ${latLonText}<br>
-        ${speedText}<br>
-        ${lapCountText}
+        ${rmcRawText}<br>
+        ${speedText} | ${lapCountText}
     `;
+    
+    // RMCステータスに応じて色を付ける (A=緑, V=赤)
+    const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
+    elem.debugInfo.style.color = statusColor;
 }
 
 // WebUSBデータ読み取りループ
@@ -721,6 +731,8 @@ async function stopGps() {
     if(elem.nmeaLog) elem.nmeaLog.textContent = 'No NMEA data yet...';
     currentLat = 0.0;
     currentLon = 0.0;
+    latestRmcStatus = 'N/A';
+    latestRmcRawLatLon = 'N/A';
     lastPosition = null; // 位置情報もリセット
     updateDebugDisplay();
 }
