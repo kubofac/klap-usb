@@ -100,6 +100,7 @@
             width: 100%;
             gap: 15px;
             padding-top: 10px;
+            flex-wrap: wrap; /* ボタンが多いので折り返しを許可 */
         }
 
         .button {
@@ -114,6 +115,7 @@
             transition: background-color 0.2s ease;
             text-align: center;
             flex-grow: 1;
+            min-width: 80px; /* ボタンの最小幅 */
         }
         
         .button:hover { background-color: #4a4a4e; }
@@ -159,13 +161,13 @@
         }
         /* NMEAログ表示エリアのスタイル */
         #nmeaLog {
-            height: 30px; /* 1行が見える程度の高さに制限 */
-            overflow: hidden; /* スクロールを無効化 */
+            height: 30px; 
+            overflow: hidden; 
             border: 1px solid #ccc; 
             padding: 5px; 
             font-size: 10px;
             background-color: #000;
-            white-space: pre; /* 折り返しを無効化して1行表示を強調 */
+            white-space: pre; 
             pointer-events: all; 
             line-height: 1;
         }
@@ -192,6 +194,8 @@
                 flex-grow: 1;
                 padding: 10px 8px;
                 font-size: 14px;
+                min-width: 70px;
+                margin: 5px 0;
             }
             #display1 { font-size: 40px; }
             #display { font-size: 25px; }
@@ -202,7 +206,6 @@
                 width: auto;
             }
             #nmeaLog {
-                /* モバイルでは少し大きく表示 */
                 font-size: 8px;
             }
         }
@@ -233,6 +236,7 @@
         <button id="reset" class="button">reset</button>
         <button id="gpsButton" class="button no-gps">GPS</button>
         <button id="getSettingsBtn" class="button no-setting">GET</button>
+        <button id="set10HzButton" class="button no-setting" disabled>10Hz設定</button>
     </div>
 </div>
 
@@ -267,7 +271,8 @@ const elem = {
     lapButton: null,
     gpsButton: null,
     getSettingsBtn: null,
-    nmeaLog: null 
+    nmeaLog: null,
+    set10HzButton: null // 💡 追加
 };
 
 // GPSラップ計測用変数 - localStorageから読み込む
@@ -280,8 +285,8 @@ let keepReading = true;
 let nmeaBuffer = '';
 const NMEA_VENDOR_ID = 0x1546;    
 const NMEA_PRODUCT_ID = 0x01A8;  
-// 💡 NMEAが表示され、接続が確定した設定値
-const IN_ENDPOINT = 2;            
+const IN_ENDPOINT = 2;           
+const OUT_ENDPOINT = 2; // 💡 OUTエンドポイントを追加
 const INTERFACE_NUMBER = 1;
 
 // --- 更新レート/デバッグ表示用変数 ---
@@ -291,8 +296,6 @@ let displayRateTimer = null;
 let currentUpdateRate = 0; 
 let currentLat = 0.0;
 let currentLon = 0.0;
-
-// 💡 画面デバッグ用に追加した変数
 let latestRmcStatus = 'N/A';
 let latestRmcRawLatLon = 'N/A';
 
@@ -469,7 +472,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数 (dmsToDecimal修正)
+// WebUSB/NMEA/更新レート関連の関数 
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -479,7 +482,7 @@ function dmsToDecimal(dmm, direction) {
     const dotIndex = dmm.indexOf('.');
     
     if (dotIndex !== -1) {
-        // 💡 修正ロジック: NMEA DMM形式では、「分」は常に小数点前の2桁と固定
+        // 💡 NMEA DMM形式では、「分」は常に小数点前の2桁と固定
         const minuteStartIndex = dotIndex - 2;
         
         if (minuteStartIndex > 0) {
@@ -500,7 +503,7 @@ function dmsToDecimal(dmm, direction) {
         }
 
     } else {
-        // 小数点がない場合（古いデータ形式または解析失敗データ）の対応
+        // 小数点がない場合のフォールバックロジック
         const num = parseFloat(dmm);
         if (isNaN(num)) return NaN;
         
@@ -529,13 +532,12 @@ function dmsToDecimal(dmm, direction) {
 function parseNmeaLine(line) {
     const parts = line.split(',');
     
-    // RMCセンテンスで、ステータスが 'A' (Active) の場合のみ有効と見なす
     if ((parts[0].endsWith('RMC') || parts[0].endsWith('RMC')) && parts.length >= 10 && parts[2] === 'A') {
         const lat = dmsToDecimal(parts[3], parts[4]);
         const lon = dmsToDecimal(parts[5], parts[6]); 
         
         const speedKnot = parseFloat(parts[7]) || 0;
-        const speedMps = speedKnot * 0.514444; // ノットをメートル/秒に変換
+        const speedMps = speedKnot * 0.514444; 
 
         if (isNaN(lat) || isNaN(lon)) return null;
 
@@ -543,7 +545,7 @@ function parseNmeaLine(line) {
             coords: {
                 latitude: lat,
                 longitude: lon,
-                speed: speedMps, // m/s
+                speed: speedMps, 
                 accuracy: 1
             },
             timestamp: Date.now() 
@@ -564,7 +566,6 @@ function processNmeaData(data) {
         if (line.startsWith('$') && line.length > 5) {
             const position = parseNmeaLine(line);
             
-            // 💡 RMCセンテンスから緯度経度を抽出し、デバッグ表示用の変数を更新
             if (line.includes('RMC')) {
                  try {
                      const parts = line.split(',');
@@ -575,17 +576,15 @@ function processNmeaData(data) {
 
                      // 2. RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
                      latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
-                     // 緯度経度の生データと、それぞれのN/S/E/Wのフィールドを連結
                      const rawLat = parts.length > 3 ? `${parts[3]} ${parts[4]}` : 'N/A';
                      const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
                      latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
                      
                  } catch (e) {
-                     console.error("RMC line parse error:", e, "Line:", line);
+                     // NMEA解析エラーは無視
                  }
              }
             
-            // onWebUsbPositionUpdateの呼び出しは position が有効な場合 ('A' ステータス) のみ
             if (position && swState === SW_STATE.RUN) {
                 onWebUsbPositionUpdate(position); 
             }
@@ -624,14 +623,9 @@ function updateDebugDisplay() {
     if (!elem.debugInfo) return;
 
     const rateText = `レート: ${currentUpdateRate.toFixed(0)} Hz`;
-    
-    // 💡 小数点6桁のデシマル表示
     const latLonText = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
-
-    // 💡 RMCステータスと生の緯度経度を表示
     const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
     const rmcRawText = `RAW DMM: ${latestRmcRawLatLon}`;
-    
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
     const lapCountText = `周回数: ${lapCount}`; 
 
@@ -642,7 +636,6 @@ function updateDebugDisplay() {
         ${speedText} | ${lapCountText}
     `;
     
-    // RMCステータスに応じて色を付ける (A=緑, V=赤)
     const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
     elem.debugInfo.style.color = statusColor;
 }
@@ -679,6 +672,51 @@ async function readLoop() {
     }
 }
 
+// ----------------------------------------------------------------------
+// 💡 UBX設定コマンドの定義と送信
+// ----------------------------------------------------------------------
+
+// GNRMCメッセージの出力レートを10Hz (100ms周期) に設定するUBXコマンド (CFG-MSG)
+// 0xF0: NMEA, 0x04: RMC, Rate=0x01 (1Hz/Rate * 10 = 10Hz)
+const UBX_10HZ_RMC_CMD = new Uint8Array([
+    0xB5, 0x62, // Sync Bytes
+    0x06, 0x01, // Class (CFG) / ID (CFG-MSG)
+    0x08, 0x00, // Length (8 bytes)
+    0xF0, 0x04, // Message Class (NMEA F0) / ID (RMC 04)
+    0x01, 0x00, // Port 1 (UART1) Rate: 10Hz (0x01) / Port 2 (USB) Rate: 0
+    0x00, 0x00, // Port 3 / Port 4 Rate: 0
+    0x00, 0x00, // Port 5 / Port 6 Rate: 0
+    0xFA, 0x0A  // Checksum A / Checksum B
+]);
+
+async function sendUblox10HzConfig() {
+    if (!device) {
+        elem.debugInfo.innerHTML = 'USBデバイスが接続されていません。';
+        return;
+    }
+    
+    try {
+        elem.set10HzButton.textContent = '設定送信中...';
+        
+        // UBXコマンドをGPSモジュールに送信
+        const result = await device.transferOut(OUT_ENDPOINT, UBX_10HZ_RMC_CMD);
+        
+        if (result.status === 'ok') {
+            elem.debugInfo.innerHTML = 'GPSモジュールに10Hz設定コマンドを送信しました。**10秒ほど待って**更新レートをご確認ください。';
+            elem.set10HzButton.textContent = '10Hz設定 (OK)';
+            setTimeout(() => {
+                if (elem.set10HzButton) elem.set10HzButton.textContent = '10Hz設定';
+            }, 5000); 
+        } else {
+            elem.debugInfo.innerHTML = `設定送信エラー: ${result.status}`;
+            elem.set10HzButton.textContent = '10Hz設定 (失敗)';
+        }
+    } catch (error) {
+        elem.debugInfo.innerHTML = `USB送信エラー: ${error.message}`;
+        elem.set10HzButton.textContent = '10Hz設定 (エラー)';
+    }
+}
+
 // WebUSB接続を開始
 async function startWebUsbGps() {
     try {
@@ -701,6 +739,14 @@ async function startWebUsbGps() {
         elem.gpsButton.textContent = 'GPS (停止)';
         elem.gpsButton.classList.remove('no-gps');
         elem.gpsButton.classList.add('active-blue');
+        
+        // 💡 接続成功時に10Hz設定ボタンを有効化
+        if (elem.set10HzButton) {
+            elem.set10HzButton.disabled = false;
+            elem.set10HzButton.classList.remove('no-setting');
+            elem.set10HzButton.classList.add('active-blue');
+        }
+        
         isGpsRunning = true;
         keepReading = true;
         
@@ -711,15 +757,6 @@ async function startWebUsbGps() {
         elem.debugInfo.innerHTML = `USB接続エラー: ${error.message}`;
         stopGps();
     }
-}
-
-// GPS監視を開始する
-function startGps() {
-    if (!isSettingsLoaded) {
-        elem.debugInfo.innerHTML = "GPS設定が読み込まれていません。<br>GETボタンを押して設定を読み込んでください。";
-        return;
-    }
-    startWebUsbGps();
 }
 
 // GPS監視を停止する
@@ -741,6 +778,14 @@ async function stopGps() {
     elem.gpsButton.textContent = 'GPS';
     elem.gpsButton.classList.remove('active-blue');
     elem.gpsButton.classList.add('no-gps');
+    
+    // 💡 停止時に10Hz設定ボタンを無効化
+    if (elem.set10HzButton) {
+        elem.set10HzButton.disabled = true;
+        elem.set10HzButton.classList.remove('active-blue');
+        elem.set10HzButton.classList.add('no-setting');
+        elem.set10HzButton.textContent = '10Hz設定';
+    }
     
     if(elem.nmeaLog) elem.nmeaLog.textContent = 'No NMEA data yet...';
     currentLat = 0.0;
@@ -893,12 +938,14 @@ window.addEventListener('load', () => {
     elem.gpsButton = document.getElementById('gpsButton');
     elem.getSettingsBtn = document.getElementById('getSettingsBtn');
     elem.nmeaLog = document.getElementById('nmeaLog'); 
+    elem.set10HzButton = document.getElementById('set10HzButton'); // 💡 エレメント取得
 
     if (elem.startButton) elem.startButton.addEventListener('click', clickStartSW);
     if (elem.lapButton) elem.lapButton.addEventListener('click', clickLapSW);
     if (elem.resetButton) elem.resetButton.addEventListener('click', clickResetSW);
     if (elem.gpsButton) elem.gpsButton.addEventListener('click', clickGpsButton);
     if (elem.getSettingsBtn) elem.getSettingsBtn.addEventListener('click', getSettings);
+    if (elem.set10HzButton) elem.set10HzButton.addEventListener('click', sendUblox10HzConfig); // 💡 イベントリスナー設定
     
     updateButtonDisplay();
     totalTimePrint(0);
