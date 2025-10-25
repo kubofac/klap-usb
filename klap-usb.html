@@ -135,7 +135,6 @@
         .active-blue:active { background-color: #0066cc; }
 
         #debug-overlay {
-            /* 💡 前回display: none; を削除 */
             position: absolute;
             top: 0;
             left: 0;
@@ -161,7 +160,7 @@
         }
         /* NMEAログ表示エリアのスタイル */
         #nmeaLog {
-            /* 💡 修正箇所: NMEAログ表示を非表示 */
+            /* NMEAログ表示を非表示 */
             display: none; 
             height: 30px; 
             overflow: hidden; 
@@ -217,7 +216,7 @@
     <div id="debug-overlay">
         <p id="status-display" class="status-text">GPS設定: 未取得</p>
         <div id="debugInfo" class="status-text"></div>
-        <div id="nmea-raw-container">
+        <div id="nmea-raw-container" style="display: none;">
             <p class="status-text">NMEA Raw Data (Latest):</p>
             <pre id="nmeaLog">No NMEA data yet...</pre>
         </div>
@@ -273,7 +272,7 @@ const elem = {
     gpsButton: null,
     getSettingsBtn: null,
     nmeaLog: null,
-    nmeaRawContainer: null // NMEAログとテキストを非表示にするためのコンテナを追加
+    nmeaRawContainer: null 
 };
 
 // GPSラップ計測用変数 - localStorageから読み込む
@@ -309,6 +308,11 @@ let currentGgaUpdateRate = 0;
 let latestGgaStatus = 'N/A'; // Fix Quality
 let latestGgaRawLatLon = 'N/A';
 // ------------------------------------
+
+// 💡 追加するデバッグ情報用のグローバル変数
+let latestDistance = 0.0;
+let latestTimeSinceLap = 0;
+let latestIsCrossing = false;
 
 
 // --- ストップウォッチ関連の関数 ---
@@ -713,14 +717,17 @@ function stopRateMeasurement() {
 
 // リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示) 
 function realTimeUpdateDebugInfo() {
-    const ggaRawDmmDisplay = document.getElementById('ggaRawDmmDisplay');
-    if (ggaRawDmmDisplay) {
-        ggaRawDmmDisplay.textContent = `GGA RAW DMM: ${latestGgaRawLatLon}`;
-    }
+    // デバッグ情報全体が非表示でないことを確認
+    if (elem.debugInfo && elem.debugInfo.parentElement.style.display !== 'none') {
+        const ggaRawDmmDisplay = document.getElementById('ggaRawDmmDisplay');
+        if (ggaRawDmmDisplay) {
+            ggaRawDmmDisplay.textContent = `GGA RAW DMM: ${latestGgaRawLatLon}`;
+        }
 
-    const decLatLonDisplay = document.getElementById('decLatLonDisplay');
-    if (decLatLonDisplay) {
-        decLatLonDisplay.textContent = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
+        const decLatLonDisplay = document.getElementById('decLatLonDisplay');
+        if (decLatLonDisplay) {
+            decLatLonDisplay.textContent = `DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}`;
+        }
     }
 }
 
@@ -728,18 +735,21 @@ function realTimeUpdateDebugInfo() {
 // デバッグ表示を更新する関数
 function updateDebugDisplay() {
     if (!elem.debugInfo) return;
-
-    const rateText = `総レート: ${currentUpdateRate.toFixed(0)} Hz | RMCレート: ${currentRmcUpdateRate.toFixed(0)} Hz | GGAレート: ${currentGgaUpdateRate.toFixed(0)} Hz`;
     
+    // 💡 既存のデバッグ情報
+    const rateText = `総レート: ${currentUpdateRate.toFixed(0)} Hz | RMCレート: ${currentRmcUpdateRate.toFixed(0)} Hz | GGAレート: ${currentGgaUpdateRate.toFixed(0)} Hz`;
     const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
     const ggaStatusText = `GGA Status: ${latestGgaStatus}`;
-    
     const latLonText = `<span id="decLatLonDisplay">DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}</span>`; 
-
     const rmcRawText = `RMC RAW DMM: ${latestRmcRawLatLon}`;
-    
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
     const lapCountText = `周回数: ${lapCount}`; 
+    
+    // 💡 追加するデバッグ情報
+    const distanceText = `距離: ${latestDistance.toFixed(2)} m`;
+    const timeSinceLapText = `前回からの経過時間: ${(latestTimeSinceLap / 1000).toFixed(2)}秒`;
+    const crossingText = `ライン通過: ${latestIsCrossing}`;
+
 
     elem.debugInfo.innerHTML = `
         ${rateText}<br>
@@ -747,10 +757,11 @@ function updateDebugDisplay() {
         ${latLonText}<br>
         ${rmcRawText}<br>
         <span id="ggaRawDmmDisplay">GGA RAW DMM: ${latestGgaRawLatLon}</span><br>
-        ${speedText} | ${lapCountText}
+        ${speedText} | ${lapCountText}<br>
+        ${distanceText} | ${timeSinceLapText} | ${crossingText}
     `;
     
-    const statusColor = (latestRmcStatus === 'A') ? 'lime' : (latestRmcStatus === 'V' ? 'red' : 'white');
+    const statusColor = (latestRmcStatus === 'A' || latestGgaStatus.startsWith('FIX')) ? 'lime' : 'white';
     elem.debugInfo.style.color = statusColor;
     
     realTimeUpdateDebugInfo();
@@ -770,7 +781,7 @@ async function readLoop() {
                 updateCounter++;
 
                 if (nmeaLogElement && nmeaData.length > 0) {
-                    // NMEAログ表示が非表示でも、ログデータを取得
+                    // NMEAログ表示が非表示
                     if (nmeaLogElement.style.display !== 'none') {
                         const lines = nmeaData.trim().split('\n');
                         if (lines.length > 0) {
@@ -862,6 +873,11 @@ async function stopGps() {
     latestGgaStatus = 'N/A';
     latestGgaRawLatLon = 'N/A';
     lastPosition = null;
+    
+    // 💡 停止時にデバッグ情報をリセット
+    latestDistance = 0.0;
+    latestTimeSinceLap = 0;
+    latestIsCrossing = false;
     updateDebugDisplay();
 }
 
@@ -935,6 +951,13 @@ function onWebUsbPositionUpdate(position) {
             speed: position.coords.speed || 0 
         }; 
         previousSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+        
+        // 💡 初期値設定
+        const P = calculatePerpendicularFootApprox(LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon, currentLat, currentLon);
+        latestDistance = calculateDistance(currentLat, currentLon, P.latitude, P.longitude);
+        latestTimeSinceLap = currentTime - lastLapTime;
+        latestIsCrossing = false;
+        
         return;
     }
 
@@ -946,6 +969,12 @@ function onWebUsbPositionUpdate(position) {
     const P = calculatePerpendicularFootApprox(LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon, currentLat, currentLon);
     const distanceToStartLine = calculateDistance(currentLat, currentLon, P.latitude, P.longitude);
     const isNearStartLine = distanceToStartLine <= gpsThresholdValue;
+
+    // 💡 デバッグ情報を更新
+    latestDistance = distanceToStartLine;
+    latestTimeSinceLap = timeSinceLastLap;
+    latestIsCrossing = isCrossingLine;
+    
 
     if (isCrossingLine && isCoolDownOver && isNearStartLine) {
         
@@ -998,6 +1027,9 @@ function onWebUsbPositionUpdate(position) {
         }, 10000);
         
         lastLapTime = lapTimeBase;
+        
+        // ラップ直後の経過時間はリセットされる
+        latestTimeSinceLap = lapTimeBase - lastLapTime; 
     }
 
     // 速度はposition.coords.speed（RMCから取得）または前回の速度（GGAの場合）
@@ -1030,10 +1062,9 @@ window.addEventListener('load', () => {
     elem.gpsButton = document.getElementById('gpsButton');
     elem.getSettingsBtn = document.getElementById('getSettingsBtn');
     elem.nmeaLog = document.getElementById('nmeaLog'); 
-    // 新しいコンテナ要素を取得
     elem.nmeaRawContainer = document.getElementById('nmea-raw-container'); 
     
-    // NMEAログとそのラベルを非表示にする
+    // NMEAログとそのラベルを非表示に設定（スタイルシートで行っているが、念のためこちらでも）
     if (elem.nmeaRawContainer) {
         elem.nmeaRawContainer.style.display = 'none';
     }
