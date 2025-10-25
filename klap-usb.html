@@ -528,7 +528,7 @@ function processNmeaData(data) {
         if (line.startsWith('$') && line.length > 5) {
             const position = parseNmeaLine(line);
             
-            // 💡 修正点2: 全てのRMCセンテンスから緯度経度を抽出してグローバル変数を更新
+            // 💡 修正点: 全てのRMCセンテンスから緯度経度を抽出し、デバッグログを出力
             if (line.includes('RMC')) {
                  try {
                      const parts = line.split(',');
@@ -536,8 +536,18 @@ function processNmeaData(data) {
                      // RMCステータス ('A' or 'V') にかかわらず、デバッグ表示用に緯度経度を更新
                      currentLat = dmsToDecimal(parts[3], parts[4]);
                      currentLon = dmsToDecimal(parts[5], parts[6]);
+                     
+                     // 🚨 デバッグログの追加 🚨
+                     if (!isNaN(currentLat) && !isNaN(currentLon)) {
+                        const status = parts.length > 2 ? parts[2] : 'N/A';
+                        console.log(`RMC Data: Status=${status}, Lat=${currentLat.toFixed(6)}, Lon=${currentLon.toFixed(6)}`);
+                     } else {
+                        console.log(`RMC Data: Status=${parts.length > 2 ? parts[2] : 'N/A'}, Lat/Lon parse failed`);
+                     }
+                     // 🚨 デバッグログ終了 🚨
+                     
                  } catch (e) {
-                     // 解析失敗時は何もしない
+                     console.error("RMC line parse error:", e, "Line:", line);
                  }
              }
             
@@ -594,11 +604,6 @@ function updateDebugDisplay() {
 
     const lapCountText = `周回数: ${lapCount}`; 
 
-    // NMEAログ要素も更新（readLoopで更新されるため、ここでは省略可能だが、初期表示のために維持）
-    // if (elem.nmeaLog && elem.nmeaLog.textContent === '') {
-    //     elem.nmeaLog.textContent = 'No NMEA data yet...';
-    // }
-
     elem.debugInfo.innerHTML = `
         ${rateText}<br>
         ${latLonText}<br>
@@ -619,7 +624,7 @@ async function readLoop() {
                 const decoder = new TextDecoder('iso-8859-1');
                 const nmeaData = decoder.decode(result.data);
                 
-                // 💡 修正点1: データが受信されるたびにカウンターをインクリメント
+                // 💡 修正点: データが受信されるたびにカウンターをインクリメント
                 updateCounter++;
 
                 // --- NMEAログの最新1行のみ表示 (生のデータ表示) ---
