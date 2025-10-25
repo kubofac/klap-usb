@@ -296,7 +296,7 @@ let currentLon = 0.0;
 let latestRmcStatus = 'N/A';
 let latestRmcRawLatLon = 'N/A';
 // ------------------------------------
-// 💡 追加: RMC更新レート計測用変数
+// 💡 RMC更新レート計測用変数
 let rmcUpdateCounter = 0;
 let currentRmcUpdateRate = 0;
 // ------------------------------------
@@ -474,7 +474,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数 (dmsToDecimal修正)
+// WebUSB/NMEA/更新レート関連の関数 (dmsToDecimal, parseNmeaLine修正)
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -484,7 +484,7 @@ function dmsToDecimal(dmm, direction) {
     const dotIndex = dmm.indexOf('.');
     
     if (dotIndex !== -1) {
-        // 💡 修正ロジック: NMEA DMM形式では、「分」は常に小数点前の2桁と固定
+        // 💡 NMEA DMM形式では、「分」は常に小数点前の2桁と固定
         const minuteStartIndex = dotIndex - 2;
         
         if (minuteStartIndex > 0) {
@@ -533,7 +533,7 @@ function parseNmeaLine(line) {
     const parts = line.split(',');
     
     // ----------------------------------------------------
-    // 💡 修正箇所: NMEAヘッダーの末尾がRMCであれば、どのGNSSプレフィックスでも受け入れる
+    // 💡 修正: NMEAヘッダーの末尾がRMCであれば、どのGNSSプレフィックスでも受け入れる
     // ----------------------------------------------------
     if (parts[0].toUpperCase().endsWith('RMC') && parts.length >= 10 && parts[2] === 'A') {
         const lat = dmsToDecimal(parts[3], parts[4]);
@@ -542,7 +542,15 @@ function parseNmeaLine(line) {
         const speedKnot = parseFloat(parts[7]) || 0;
         const speedMps = speedKnot * 0.514444; // ノットをメートル/秒に変換
 
-        if (isNaN(lat) || isNaN(lon)) return null;
+        if (isNaN(lat) || isNaN(lon)) {
+            // 緯度経度が不正な場合は解析失敗
+            return null;
+        }
+        
+        // ----------------------------------------------------
+        // 💡 修正箇所: 有効なRMCメッセージが解析されたときのみカウント
+        // ----------------------------------------------------
+        rmcUpdateCounter++;
 
         return {
             coords: {
@@ -567,10 +575,10 @@ function processNmeaData(data) {
         nmeaBuffer = nmeaBuffer.substring(newlineIndex + 1);
 
         if (line.startsWith('$') && line.length > 5) {
-            const position = parseNmeaLine(line);
+            const position = parseNmeaLine(line); // parseNmeaLine内でrmcUpdateCounter++が行われる
             
-            // 💡 RMCセンテンスから緯度経度を抽出し、デバッグ表示用の変数を更新
-            if (line.toUpperCase().includes('RMC')) { // 修正後のロジックに合わせてincludes('RMC')を使用
+            // RMCメッセージに関するデバッグ情報を更新
+            if (line.toUpperCase().includes('RMC')) { 
                  try {
                      const parts = line.split(',');
                      
@@ -580,14 +588,12 @@ function processNmeaData(data) {
 
                      // 2. RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
                      latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
-                     // 緯度経度の生データと、それぞれのN/S/E/Wのフィールドを連結
                      const rawLat = parts.length > 3 ? `${parts[3]} ${parts[4]}` : 'N/A';
                      const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
                      latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
                      
                      // ----------------------------------------------------
-                     // 💡 追加: RMC更新カウンターをインクリメント
-                     rmcUpdateCounter++;
+                     // 💡 削除: rmcUpdateCounter++; // parseNmeaLineに移動した
                      // ----------------------------------------------------
                      
                  } catch (e) {
@@ -621,7 +627,7 @@ function startRateMeasurement() {
         updateCounter = 0; 
         // 💡 RMCレート計測の計算
         currentRmcUpdateRate = rmcUpdateCounter;
-        rmcUpdateCounter = 0;
+        rmcUpdateCounter = 0; // カウンターをリセット
         
         updateDebugDisplay(); 
     }, 1000); 
