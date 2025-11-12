@@ -259,6 +259,10 @@ let lapCoolDown = 15000;
 let isSettingsLoaded = false;
 let lapFixedDisplayTimeoutId = null;
 
+// 💡 速度と加速度の履歴を保持する配列 (最新3点分)
+let velocityHistory = [];
+const VELOCITY_HISTORY_SIZE = 3; 
+
 const elem = {
     display: null,
     display1: null,
@@ -290,7 +294,7 @@ const INTERFACE_NUMBER = 1;
 // --- 更新レート/デバッグ表示用変数 ---
 let lastUpdateTime = 0;    
 let updateCounter = 0;    
-let displayRateTimer = null;       
+let displayRateTimer = null;        
 let currentUpdateRate = 0;    
 let currentLat = 0.0;
 let currentLon = 0.0;
@@ -301,7 +305,7 @@ let latestRmcRawLatLon = 'N/A';
 let rmcUpdateCounter = 0;
 let currentRmcUpdateRate = 0;
 
-// 💡 GGAデバッグ用変数    
+// 💡 GGAデバッグ用変数      
 let ggaUpdateCounter = 0;
 let currentGgaUpdateRate = 0;
 let latestGgaStatus = 'N/A'; // Fix Quality
@@ -313,6 +317,8 @@ let latestGgaFixQuality = 0; // <--- ADDED: Fix Qualityの数値 (0:No Fix, 1:GP
 let latestDistance = 0.0;
 let latestTimeSinceLap = 0;
 let latestIsCrossing = false;
+let latestPredictedTime = 0; // 💡 予測される通過時刻 (デバッグ用)
+let latestAcceleration = 0.0; // 💡 最新の加速度 (デバッグ用)
 
 
 // --- ストップウォッチ関連の関数 ---
@@ -488,7 +494,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数    
+// WebUSB/NMEA/更新レート関連の関数      
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -542,6 +548,37 @@ function dmsToDecimal(dmm, direction) {
     }
 }
 
+// 💡 速度履歴を更新し、平均加速度を計算する関数
+function updateVelocityHistory(currentSpeed, currentTime) {
+    if (currentSpeed === undefined || currentTime === undefined) return 0.0;
+    
+    // 履歴に追加
+    velocityHistory.push({ speed: currentSpeed, time: currentTime });
+    
+    // 履歴サイズを制限
+    while (velocityHistory.length > VELOCITY_HISTORY_SIZE) {
+        velocityHistory.shift();
+    }
+    
+    if (velocityHistory.length < 2) return 0.0; // 加速度計算には最低2点必要
+    
+    // 直近2点の加速度を計算 (簡易的)
+    const p_current = velocityHistory[velocityHistory.length - 1];
+    const p_prev = velocityHistory[velocityHistory.length - 2];
+    
+    const deltaV = p_current.speed - p_prev.speed;
+    const deltaT = (p_current.time - p_prev.time) / 1000; // msを秒に変換
+    
+    if (deltaT > 0.001) {
+        const acceleration = deltaV / deltaT;
+        latestAcceleration = acceleration; // デバッグ用グローバル変数に保存
+        return acceleration;
+    }
+    
+    return 0.0;
+}
+
+
 // NMEAメッセージを解析し、位置情報オブジェクトを返す (GGAを位置の主軸、RMCを速度の主軸とする)
 function parseNmeaLine(line) {
     const parts = line.split(',');
@@ -572,7 +609,6 @@ function parseNmeaLine(line) {
                 updateCounter++; // 総レートはGGAでカウント
 
                 // 速度は直近のRMCから取得するため、lastPositionの速度を使う
-                // lastPosition.speedに速度が保存されていることを前提とする
                 const currentSpeed = (lastPosition && lastPosition.speed !== null) ? lastPosition.speed : 0;
                 
                 return {
@@ -580,6 +616,7 @@ function parseNmeaLine(line) {
                         latitude: lat,
                         longitude: lon,
                         speed: currentSpeed, // RMCから取得した最新の速度
+                        acceleration: latestAcceleration, // 💡 最新の加速度
                         accuracy: 1
                     },
                     timestamp: Date.now()
@@ -596,7 +633,7 @@ function parseNmeaLine(line) {
         rmcUpdateCounter++;
         
         const speedKnot = parseFloat(parts[7]) || 0;
-        const speedMps = speedKnot * 0.514444; 
+        const speedMps = speedKnot * 0.514444; // ノットを m/s に変換 
 
         // デバッグ情報更新
         latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
@@ -610,12 +647,16 @@ function parseNmeaLine(line) {
         } else {
              // 初回RMCの場合の初期化
              lastPosition = {
-                lat: currentLat, // 最新のGGA座標（または前回値）
-                lon: currentLon,
-                time: Date.now(),
-                speed: speedMps 
+                 lat: currentLat, // 最新のGGA座標（または前回値）
+                 lon: currentLon,
+                 time: Date.now(),
+                 speed: speedMps 
             };
         }
+        
+        // 💡 速度履歴を更新し、加速度を計算
+        updateVelocityHistory(speedMps, Date.now());
+
 
         // RMCは位置情報を提供しないため、ここではnullを返す
         return null;
@@ -636,12 +677,6 @@ function processNmeaData(data) {
         if (line.startsWith('$') && line.length > 5) {
             const position = parseNmeaLine(line);
             
-            // ------------------------------------------------------------------
-            // 💡 削除されたロジック:
-            // RMC/GGAメッセージに関するデバッグ情報（座標やステータス）の更新は、
-            // 全て parseNmeaLine 関数に集約されました。
-            // ------------------------------------------------------------------
-
             if (position && swState === SW_STATE.RUN) {
                 onWebUsbPositionUpdate(position);
             }
@@ -688,7 +723,7 @@ function stopRateMeasurement() {
     currentGgaUpdateRate = 0;
 }
 
-// リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示)    
+// リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示)      
 function realTimeUpdateDebugInfo() {
     // デバッグ情報全体が非表示でないことを確認
     if (elem.debugInfo && elem.debugInfo.parentElement.style.display !== 'none') {
@@ -716,13 +751,16 @@ function updateDebugDisplay() {
     const latLonText = `<span id="decLatLonDisplay">DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}</span>`;    
     const rmcRawText = `RMC RAW DMM: ${latestRmcRawLatLon}`;
     // lastPosition.speedを参照するように修正
-    const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
+    const speed = (lastPosition && lastPosition.speed !== null) ? lastPosition.speed : 0;
+    const speedText = `速度: ${speed.toFixed(2)} m/s`;
     const lapCountText = `周回数: ${lapCount}`;    
     
     // 💡 追加するデバッグ情報
     const distanceText = `距離: ${latestDistance.toFixed(2)} m`;
     const timeSinceLapText = `前回からの経過時間: ${(latestTimeSinceLap / 1000).toFixed(2)}秒`;
     const crossingText = `ライン通過: ${latestIsCrossing}`;
+    const accelText = `加速度: ${latestAcceleration.toFixed(2)} m/s²`; // 💡 加速度を追加
+    const predictedTimeText = `予測時刻: ${(latestPredictedTime / 1000).toFixed(3)} 秒後`; // 💡 予測時間を追加
 
 
     elem.debugInfo.innerHTML = `
@@ -731,8 +769,9 @@ function updateDebugDisplay() {
         ${latLonText}<br>
         ${rmcRawText}<br>
         <span id="ggaRawDmmDisplay">GGA RAW DMM: ${latestGgaRawLatLon}</span><br>
-        ${speedText} | ${lapCountText}<br>
-        ${distanceText} | ${timeSinceLapText} | ${crossingText}
+        ${speedText} | ${accelText}<br>
+        ${lapCountText} | ${distanceText} | ${predictedTimeText}<br>
+        ${timeSinceLapText} | ${crossingText}
     `;
     
     const statusColor = (latestRmcStatus === 'A' || latestGgaStatus.startsWith('FIX')) ? 'lime' : 'white';
@@ -849,13 +888,59 @@ async function stopGps() {
     latestGgaRawLatLon = 'N/A';
     latestGgaFixQuality = 0; // <--- ADDED reset
     lastPosition = null;
+    velocityHistory = []; // 💡 速度履歴をリセット
     
     // 💡 停止時にデバッグ情報をリセット
     latestDistance = 0.0;
     latestTimeSinceLap = 0;
     latestIsCrossing = false;
+    latestPredictedTime = 0;
+    latestAcceleration = 0.0;
     updateDebugDisplay();
 }
+
+// 💡 運動方程式 (D = Vt + 1/2 A t^2) に基づき、残り距離を移動する予測時間tを求める
+function calculateTimeToLine(distance, velocity, acceleration) {
+    if (velocity < 0.5 && acceleration < 0.1) return null; // 停止状態または低速では予測しない
+
+    // 加速度が非常に小さい場合 (線形予測: t = D/V)
+    if (Math.abs(acceleration) < 0.01) {
+        return distance / velocity;
+    }
+
+    // 二次方程式: (1/2 A) t^2 + V t - D = 0
+    const a = 0.5 * acceleration;
+    const b = velocity;
+    const c = -distance;
+
+    const discriminant = b * b - 4 * a * c; // 判別式 (D=b^2 - 4ac)
+
+    if (discriminant < 0) {
+        // 判別式が負の場合、実数解なし（計算上、ありえない動き）
+        return null;
+    }
+
+    const sqrtD = Math.sqrt(discriminant);
+
+    // 二次方程式の解: t = (-b ± sqrt(D)) / 2a
+    // 通常、移動時間は正であるため、最も合理的で正の解を選択
+    
+    let t1 = (-b + sqrtD) / (2 * a);
+    let t2 = (-b - sqrtD) / (2 * a);
+    
+    // 正の解のうち、小さい方（最も早く到達する時間）を選ぶ
+    let positiveTimes = [];
+    // 誤差を考慮し、微小な負の時間は無視する（例: -0.001秒）
+    if (t1 > -0.001) positiveTimes.push(t1);
+    if (t2 > -0.001) positiveTimes.push(t2);
+
+    if (positiveTimes.length === 0) return null; // 正の解がない場合
+    
+    // 最小の正の時間を返す
+    const minPositiveTime = Math.min(...positiveTimes.filter(t => t >= 0));
+    return minPositiveTime === Infinity ? null : minPositiveTime;
+}
+
 
 // WebUSBからの位置情報更新処理（ラップ計測ロジック）
 function onWebUsbPositionUpdate(position) {
@@ -867,6 +952,8 @@ function onWebUsbPositionUpdate(position) {
     
     const currentLat = position.coords.latitude;
     const currentLon = position.coords.longitude;
+    const currentSpeed = position.coords.speed; // m/s
+    const currentAccel = position.coords.acceleration; // m/s² (💡 新しい値)
     const currentTime = Date.now();
     
     // ヘルパー関数群
@@ -887,8 +974,8 @@ function onWebUsbPositionUpdate(position) {
         const lineLenSq = dx * dx + dy * dy;
         if (lineLenSq < 1e-9) return { latitude: lineLat1, longitude: lineLon1 };
         const t = ((pointLon - lineLon1) * dx + (pointLat - lineLat1) * dy) / lineLenSq;
-        if (t < 0) return { latitude: lineLat1, longitude: lineLon1 };
-        if (t > 1) return { latitude: lineLat2, longitude: lineLon2 };
+        // スタートラインの線分の外側であっても、垂線上の点として返す（ここではクリップしない）
+        // t < 0 の場合でも、垂線の足は計算される
         return { latitude: lineLat1 + t * dy, longitude: lineLon1 + t * dx };
     };
     
@@ -896,27 +983,8 @@ function onWebUsbPositionUpdate(position) {
         return (lineLon2 - lineLon1) * (pointLat - lineLat1) - (lineLat2 - lineLat1) * (pointLon - lineLon1);
     };
 
-    const getIntersectionTime = (p1, p2) => {
-        // p1(lat, lon, time), p2(lat, lon, time)
-        
-        // 分母
-        const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
-        if (Math.abs(den) < 1e-9) return null;
-        
-        // P1->P2間の交差比率 t_ratio の分子
-        const t_num = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon);
-        const t_ratio = t_num / den;
-
-        if (t_ratio < 0 || t_ratio > 1) return null; // P1-P2の線分の外側で交差
-        
-        // スタートラインの線分の範囲チェック (u)
-        const u_num = (LAP_LINE_P1.lat - p1.lat) * (p2.lon - p1.lon) - (LAP_LINE_P1.lon - p1.lon) * (p2.lat - p1.lat);
-        const u = u_num / den;
-        if (u < 0 || u > 1) return null; // スタートラインの線分の外側
-
-        // 比率を使って時間を補間
-        return p1.time + (p2.time - p1.time) * t_ratio;
-    };
+    // 💡 削除された getIntersectionTime (直線補間)
+    
     // ヘルパー関数群ここまで
 
     if (!lastPosition) {
@@ -924,7 +992,7 @@ function onWebUsbPositionUpdate(position) {
             lat: currentLat,    
             lon: currentLon,    
             time: currentTime,    
-            speed: position.coords.speed || 0    
+            speed: currentSpeed || 0    
         };    
         previousSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
         
@@ -937,89 +1005,114 @@ function onWebUsbPositionUpdate(position) {
         return;
     }
 
-    // lastPositionの更新は、ラップ計測ロジックの最後に移動し、GGAまたはRMCによって最新の速度が既にlastPosition.speedに入っていることを前提とする
-    // lastPositionの緯度/経度/時刻を一時的に変数に保存
-    const P1_lat = lastPosition.lat;
-    const P1_lon = lastPosition.lon;
-    const P1_time = lastPosition.time;
-
-
+    // 💡 加速/減速を考慮した予測ロジック
+    
     const currentSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
+    
+    // ラインを横切ったかどうかの判定は、現在の点と前回の点のラインに対するサイドで判定
     const isCrossingLine = (previousSideOfLine > 0 && currentSideOfLine < 0) || (previousSideOfLine < 0 && currentSideOfLine > 0);
+    
     const timeSinceLastLap = currentTime - lastLapTime;
     const isCoolDownOver = (lapCount === 0) || (timeSinceLastLap >= lapCoolDown);
 
+    // スタートラインの垂線の足Pを計算
     const P = calculatePerpendicularFootApprox(LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon, currentLat, currentLon);
+    // Pまでの距離（メートル）
     const distanceToStartLine = calculateDistance(currentLat, currentLon, P.latitude, P.longitude);
+    
+    // 閾値以内に入ったかどうか
     const isNearStartLine = distanceToStartLine <= gpsThresholdValue;
 
     // 💡 デバッグ情報を更新
     latestDistance = distanceToStartLine;
     latestTimeSinceLap = timeSinceLastLap;
-    latestIsCrossing = isCrossingLine;
     
+    // **速度と加速度を使った予測通過時間 (秒)** を計算
+    const predictedTimeSec = calculateTimeToLine(distanceToStartLine, currentSpeed, currentAccel);
+    const predictedTimeMs = predictedTimeSec !== null ? predictedTimeSec * 1000 : null; // 秒をミリ秒に変換
+    
+    latestPredictedTime = predictedTimeMs !== null ? predictedTimeMs : 0; // デバッグ表示用
+    
+    // 予測による通過判定
+    const predictedCrossingTime = predictedTimeMs !== null ? currentTime + predictedTimeMs : null;
 
-    if (isCrossingLine && isCoolDownOver && isNearStartLine) {
-        
-        // 速度に依存しない、純粋な直線補間用の位置データ
-        const P1_for_Intersection = {    
-            lat: P1_lat,    
-            lon: P1_lon,    
-            time: P1_time    
-        };
-        const P2_for_Intersection = {    
-            lat: currentLat,    
-            lon: currentLon,    
-            time: currentTime    
-        };
+    // 前回の位置と現在の位置の間にラインを跨いでいるか、または予測通過時間が閾値内か
+    // (次の2回の更新で通過予測される場合を通過候補とする)
+    const shouldCheckLap = isCrossingLine || (predictedTimeMs !== null && predictedTimeMs <= (1000 / currentUpdateRate) * 2); 
 
-        // P1とP2を結ぶ線分と、スタートラインの交差時刻を推定
-        const intersectionTime = getIntersectionTime(P1_for_Intersection, P2_for_Intersection);
+    latestIsCrossing = shouldCheckLap; // デバッグ表示用
+
+    if (shouldCheckLap && isCoolDownOver && isNearStartLine) {
         
-        if (intersectionTime !== null) {
+        // 💡 予測された通過時刻を優先 (二次補間/運動予測)
+        let finalLapTime = null;
+        
+        if (predictedCrossingTime !== null && predictedTimeMs > 0) {
+            // 運動予測が成功し、時間が正の場合、予測時間を採用
+            finalLapTime = predictedCrossingTime;
             
-            // 補間された正確な交差時刻を用いてラップタイムを計算
-            const lapDuration = intersectionTime - lapStartTime;
+        } else if (isCrossingLine) {
+             // 運動予測が使えないが、ライン横断（isCrossingLine）が確認された場合、
+             // 元の直線補間ロジックで通過時刻を推定する（安全策）
             
+             const P1_for_Intersection = { lat: lastPosition.lat, lon: lastPosition.lon, time: lastPosition.time };
+             const P2_for_Intersection = { lat: currentLat, lon: currentLon, time: currentTime };
+             
+             // 💡 getIntersectionTime 関数をローカルで再定義 (元のコードからコピー)
+             const getIntersectionTime = (p1, p2) => {
+                const den = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (p2.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (p2.lon - p1.lon);
+                if (Math.abs(den) < 1e-9) return null;
+                const t_num = (LAP_LINE_P2.lon - LAP_LINE_P1.lon) * (LAP_LINE_P1.lat - p1.lat) - (LAP_LINE_P2.lat - LAP_LINE_P1.lat) * (LAP_LINE_P1.lon - p1.lon);
+                const t_ratio = t_num / den;
+                if (t_ratio < 0 || t_ratio > 1) return null; 
+                const u_num = (LAP_LINE_P1.lat - p1.lat) * (p2.lon - p1.lon) - (LAP_LINE_P1.lon - p1.lon) * (p2.lat - p1.lat);
+                const u = u_num / den;
+                if (u < 0 || u > 1) return null; 
+                return p1.time + (p2.time - p1.time) * t_ratio;
+            };
+
+            finalLapTime = getIntersectionTime(P1_for_Intersection, P2_for_Intersection);
+        }
+        
+        if (finalLapTime !== null) {
             // ラップタイムを記録
+            const lapDuration = finalLapTime - lapStartTime;
+            
             lapCount++;
             lapTimePrint(lapDuration); // ラップリストに記録
             
-            // 次のラップのスタート時間を交差時刻に設定
-            lapStartTime = intersectionTime;
-            lastLapTime = intersectionTime; // クールダウン判定用
+            // 次のラップのスタート時間を確定時刻に設定
+            lapStartTime = finalLapTime;
+            lastLapTime = finalLapTime; // クールダウン判定用
             
-            // リアルタイムラップ表示を一時停止
+            // リアルタイムラップ表示を一時停止し、確定時間を表示
             cancelAnimationFrame(lapTimerId);
-            
-            // メインディスプレイに確定ラップタイムを固定表示
             if (elem.display1) elem.display1.textContent = lapTimeToString(lapDuration);
             
-            // 2秒後にリアルタイム計測を再開
             if (lapFixedDisplayTimeoutId) {
                 clearTimeout(lapFixedDisplayTimeoutId);
             }
             lapFixedDisplayTimeoutId = setTimeout(() => {
-                // RUN状態であれば次のラップのリアルタイム計測を開始
                 if (swState === SW_STATE.RUN) {
                     startRealtimeLap();    
                 }
             }, 2000);    
 
-            // ラップ後の位置情報を更新 (lastPosition.speedはRMC処理で既に更新されている)
+            // ラップ後の位置情報を更新 
             previousSideOfLine = currentSideOfLine;
             lastPosition.lat = currentLat;
             lastPosition.lon = currentLon;
             lastPosition.time = currentTime;
+            // lastPosition.speedはRMC処理で既に更新されている
             
         } else {
-            // 交差時刻が計算できなかった場合（稀なケース）、現在のサイドと位置情報を更新
+             // 予測も補間もできなかった場合
             previousSideOfLine = currentSideOfLine;
             lastPosition.lat = currentLat;
             lastPosition.lon = currentLon;
             lastPosition.time = currentTime;
-            // lastPosition.speedはRMC処理で更新済み
         }
+        
     } else {
         // ラインを横切らなかった、またはクールダウン期間中の場合、位置情報を更新
         previousSideOfLine = currentSideOfLine;
@@ -1072,4 +1165,5 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
 
