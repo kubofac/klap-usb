@@ -271,7 +271,7 @@ const elem = {
     gpsButton: null,
     getSettingsBtn: null,
     nmeaLog: null,
-    nmeaRawContainer: null 
+    nmeaRawContainer: null    
 };
 
 // GPSラップ計測用変数 - localStorageから読み込む
@@ -282,16 +282,16 @@ let LAP_LINE_P2 = { lat: 0, lon: 0 };
 let device = null;
 let keepReading = true;
 let nmeaBuffer = '';
-const NMEA_VENDOR_ID = 0x1546;  
-const NMEA_PRODUCT_ID = 0x01A8;  
-const IN_ENDPOINT = 2;           
+const NMEA_VENDOR_ID = 0x1546;    
+const NMEA_PRODUCT_ID = 0x01A8;    
+const IN_ENDPOINT = 2;              
 const INTERFACE_NUMBER = 1;
 
 // --- 更新レート/デバッグ表示用変数 ---
-let lastUpdateTime = 0; 
-let updateCounter = 0;  
-let displayRateTimer = null;    
-let currentUpdateRate = 0;  
+let lastUpdateTime = 0;    
+let updateCounter = 0;    
+let displayRateTimer = null;       
+let currentUpdateRate = 0;    
 let currentLat = 0.0;
 let currentLon = 0.0;
 
@@ -301,11 +301,12 @@ let latestRmcRawLatLon = 'N/A';
 let rmcUpdateCounter = 0;
 let currentRmcUpdateRate = 0;
 
-// 💡 GGAデバッグ用変数 
+// 💡 GGAデバッグ用変数    
 let ggaUpdateCounter = 0;
 let currentGgaUpdateRate = 0;
 let latestGgaStatus = 'N/A'; // Fix Quality
 let latestGgaRawLatLon = 'N/A';
+let latestGgaFixQuality = 0; // <--- ADDED: Fix Qualityの数値 (0:No Fix, 1:GPS Fix, ...)
 // ------------------------------------
 
 // 💡 追加するデバッグ情報用のグローバル変数
@@ -363,15 +364,15 @@ const startRealtimeLap = () => {
     }
 };
 
-const lapTimePrint = (time) => {      
+const lapTimePrint = (time) => {          
     const lapDuration = lapTimeToString(time);
     const lapDiv = document.createElement('div');
-    lapDiv.textContent = `[${lapCount}] ${lapDuration}`;     
+    lapDiv.textContent = `[${lapCount}] ${lapDuration}`;      
     lapDiv.style.fontSize = '2.5em';
     if (elem.lap_list) {
         elem.lap_list.insertBefore(lapDiv, elem.lap_list.firstChild);
     }
-    lapRecords.push({ count: lapCount, time: lapDuration });      
+    lapRecords.push({ count: lapCount, time: lapDuration });        
 };
 
 const updateButtonDisplay = () => {
@@ -425,7 +426,7 @@ const clickLapSW = () => {
         lapCount++;
         const now = Date.now();
         const lapDuration = now - lapStartTime;
-        lapTimePrint(lapDuration);      
+        lapTimePrint(lapDuration);        
         lapStartTime = now;
         cancelAnimationFrame(lapTimerId);
         startRealtimeLap();
@@ -463,13 +464,13 @@ const getSettings = () => {
     const p2Lat = localStorage.getItem('startLineP2Lat');
     const p2Lon = localStorage.getItem('startLineP2Lon');
     const threshold = localStorage.getItem('gpsThreshold');
-    const coolDown = localStorage.getItem('lapCoolDownTime');       
+    const coolDown = localStorage.getItem('lapCoolDownTime');        
 
     if (p1Lat && p1Lon && p2Lat && p2Lon) {
         LAP_LINE_P1 = { lat: parseFloat(p1Lat), lon: parseFloat(p1Lon) };
         LAP_LINE_P2 = { lat: parseFloat(p2Lat), lon: parseFloat(p2Lon) };
         gpsThresholdValue = threshold ? parseFloat(threshold) : 20;
-        lapCoolDown = coolDown ? parseFloat(coolDown) : 15000;     
+        lapCoolDown = coolDown ? parseFloat(coolDown) : 15000;        
 
         if (elem.statusDisplay) elem.statusDisplay.textContent = `GPS設定: OK (閾値: ${gpsThresholdValue}m / C/D: ${lapCoolDown / 1000}秒)`;
         if (elem.debugInfo) elem.debugInfo.innerHTML = "GPS設定が読み込まれました。";
@@ -487,7 +488,7 @@ const getSettings = () => {
 
 
 // ----------------------------------------------------------------------
-// WebUSB/NMEA/更新レート関連の関数 
+// WebUSB/NMEA/更新レート関連の関数    
 // ----------------------------------------------------------------------
 
 // NMEAのDMMフォーマット（度分.分）を10進数に変換するヘルパー関数
@@ -541,69 +542,82 @@ function dmsToDecimal(dmm, direction) {
     }
 }
 
-// NMEAメッセージを解析し、位置情報オブジェクトを返す
+// NMEAメッセージを解析し、位置情報オブジェクトを返す (GGAを位置の主軸、RMCを速度の主軸とする)
 function parseNmeaLine(line) {
     const parts = line.split(',');
-    
-    // ----------------------------------------------------
-    // 💡 RMCメッセージの判定と処理 
-    // ----------------------------------------------------
-    if (parts[0].toUpperCase().endsWith('RMC') && parts.length >= 10) {
-        if (parts[2] === 'A') {
-            const lat = dmsToDecimal(parts[3], parts[4]);
-            const lon = dmsToDecimal(parts[5], parts[6]);  
 
-            const speedKnot = parseFloat(parts[7]) || 0;
-            const speedMps = speedKnot * 0.514444;  
-
-            if (isNaN(lat) || isNaN(lon)) {
-                return null;
-            }
-            
-            rmcUpdateCounter++;  
-
-            return {
-                coords: {
-                    latitude: lat,
-                    longitude: lon,
-                    speed: speedMps, // m/s
-                    accuracy: 1
-                },
-                timestamp: Date.now()  
-            };
-        }
-        return null;
-    }  
-    
     // ----------------------------------------------------
-    // 💡 GNGGAメッセージの判定と処理 (10Hzの位置情報供給源)
+    // 1. GNGGAメッセージの処理 (位置情報の供給源)
     // ----------------------------------------------------
-    else if (parts[0].toUpperCase().endsWith('GGA') && parts.length >= 7) {
-        ggaUpdateCounter++; // GGAメッセージが来たらカウント
-        
+    if (parts[0].toUpperCase().endsWith('GGA') && parts.length >= 7) {
+        ggaUpdateCounter++;
         const fixQuality = parseInt(parts[6]);
+        latestGgaFixQuality = fixQuality; // Fix Qualityをグローバル変数に保存
         latestGgaStatus = fixQuality > 0 ? `FIX(${fixQuality})` : 'NO FIX';
-        
-        // GGAが有効なFIX (Fix Quality > 0) の場合、座標を抽出して返す
+
+        // GGAが有効なFixを持つ場合、その座標で位置情報を更新し、ラップ計測ロジックに渡す
         if (fixQuality > 0) {
-            const lat = dmsToDecimal(parts[2], parts[3]);  
+            const lat = dmsToDecimal(parts[2], parts[3]);
             const lon = dmsToDecimal(parts[4], parts[5]);
-            
-            // GGAには速度情報がないため、lastPositionから速度を引き継ぐ
-            const currentSpeed = lastPosition && lastPosition.speed !== null ? lastPosition.speed : 0;
-            
+
             if (!isNaN(lat) && !isNaN(lon)) {
+                // リアルタイム表示用のDEC座標とRAW DMMを更新
+                currentLat = lat;
+                currentLon = lon;
+                const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
+                const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
+                latestGgaRawLatLon = `${rawLat} / ${rawLon}`;
+                realTimeUpdateDebugInfo(); // GGAで座標が更新されたら表示も更新
+
+                updateCounter++; // 総レートはGGAでカウント
+
+                // 速度は直近のRMCから取得するため、lastPositionの速度を使う
+                // lastPosition.speedに速度が保存されていることを前提とする
+                const currentSpeed = (lastPosition && lastPosition.speed !== null) ? lastPosition.speed : 0;
+                
                 return {
                     coords: {
                         latitude: lat,
                         longitude: lon,
-                        speed: currentSpeed,  
+                        speed: currentSpeed, // RMCから取得した最新の速度
                         accuracy: 1
                     },
-                    timestamp: Date.now()  
+                    timestamp: Date.now()
                 };
             }
         }
+        return null;
+    }
+    
+    // ----------------------------------------------------
+    // 2. RMCメッセージの処理 (速度情報の供給源)
+    // ----------------------------------------------------
+    else if (parts[0].toUpperCase().endsWith('RMC') && parts.length >= 8) {
+        rmcUpdateCounter++;
+        
+        const speedKnot = parseFloat(parts[7]) || 0;
+        const speedMps = speedKnot * 0.514444; 
+
+        // デバッグ情報更新
+        latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
+        const rawLat = parts.length > 3 ? `${parts[3]} ${parts[4]}` : 'N/A';
+        const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
+        latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
+
+        // lastPositionオブジェクトに速度情報のみを保存/更新する
+        if (lastPosition) {
+            lastPosition.speed = speedMps;
+        } else {
+             // 初回RMCの場合の初期化
+             lastPosition = {
+                lat: currentLat, // 最新のGGA座標（または前回値）
+                lon: currentLon,
+                time: Date.now(),
+                speed: speedMps 
+            };
+        }
+
+        // RMCは位置情報を提供しないため、ここではnullを返す
         return null;
     }
 
@@ -620,56 +634,16 @@ function processNmeaData(data) {
         nmeaBuffer = nmeaBuffer.substring(newlineIndex + 1);
 
         if (line.startsWith('$') && line.length > 5) {
-            const position = parseNmeaLine(line);  
+            const position = parseNmeaLine(line);
             
-            // RMCメッセージに関するデバッグ情報を更新
-            if (line.toUpperCase().includes('RMC')) {  
-                try {
-                    const parts = line.split(',');
-                    
-                    // RMCステータスと、生の緯度経度データ（画面デバッグ用）を更新
-                    latestRmcStatus = parts.length > 2 ? parts[2] : 'N/A';
-                    const rawLat = parts.length > 3 ? `${parts[3]} ${parts[4]}` : 'N/A';
-                    const rawLon = parts.length > 5 ? `${parts[5]} ${parts[6]}` : 'N/A';
-                    latestRmcRawLatLon = `${rawLat} / ${rawLon}`;
-                    
-                    // RMCが有効ならDEC表示を更新 (RMCを最優先)
-                    if (latestRmcStatus === 'A') {
-                        currentLat = dmsToDecimal(parts[3], parts[4]);
-                        currentLon = dmsToDecimal(parts[5], parts[6]);
-                        realTimeUpdateDebugInfo();
-                    }
-                    
-                } catch (e) {
-                    console.error("RMC line parse error:", e, "Line:", line);
-                }
-            }
-            
-            // GGAメッセージに関するデバッグ情報も更新
-            if (line.toUpperCase().includes('GGA')) {  
-                try {
-                    const parts = line.split(',');
-                    const fixQuality = parseInt(parts[6]);
-                    
-                    // GGAが有効なFIXの場合、DEC表示を無条件で更新
-                    if (fixQuality > 0) {
-                        currentLat = dmsToDecimal(parts[2], parts[3]);
-                        currentLon = dmsToDecimal(parts[4], parts[5]);
-                    }
-                    
-                    // GGA生の緯度経度をデバッグ用に取得
-                    const rawLat = parts.length > 2 ? `${parts[2]} ${parts[3]}` : 'N/A';
-                    const rawLon = parts.length > 4 ? `${parts[4]} ${parts[5]}` : 'N/A';
-                    latestGgaRawLatLon = `${rawLat} / ${rawLon}`;
-                    
-                    // リアルタイム表示を更新
-                    realTimeUpdateDebugInfo();
+            // ------------------------------------------------------------------
+            // 💡 削除されたロジック:
+            // RMC/GGAメッセージに関するデバッグ情報（座標やステータス）の更新は、
+            // 全て parseNmeaLine 関数に集約されました。
+            // ------------------------------------------------------------------
 
-                } catch (e) { /* ... */ }
-            }
-            
             if (position && swState === SW_STATE.RUN) {
-                onWebUsbPositionUpdate(position);  
+                onWebUsbPositionUpdate(position);
             }
         }
     }
@@ -683,38 +657,38 @@ function startRateMeasurement() {
     }
     
     currentUpdateRate = 0;
-    updateCounter = 0;  
+    updateCounter = 0;    
     currentRmcUpdateRate = 0;
     rmcUpdateCounter = 0;
     currentGgaUpdateRate = 0;
-    ggaUpdateCounter = 0;
+    ggaUpdateCounter = 0;    
     
     displayRateTimer = setInterval(() => {
-        currentUpdateRate = updateCounter;  
-        updateCounter = 0;  
+        currentUpdateRate = updateCounter;    
+        updateCounter = 0;    
         
         currentRmcUpdateRate = rmcUpdateCounter;
-        rmcUpdateCounter = 0;  
+        rmcUpdateCounter = 0;    
         
         currentGgaUpdateRate = ggaUpdateCounter;
-        ggaUpdateCounter = 0;  
+        ggaUpdateCounter = 0;    
         
-        updateDebugDisplay();  
-    }, 1000);  
+        updateDebugDisplay();    
+    }, 1000);    
 }
 
 // 更新レートの計測を停止
 function stopRateMeasurement() {
     if (displayRateTimer !== null) {
         clearInterval(displayRateTimer);
-        displayRateTimer = null;  
+        displayRateTimer = null;    
     }
     currentUpdateRate = 0;
-    currentRmcUpdateRate = 0;  
+    currentRmcUpdateRate = 0;    
     currentGgaUpdateRate = 0;
 }
 
-// リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示)  
+// リアルタイムで更新されるデバッグ情報 (GGA RAW DMM, DEC表示)    
 function realTimeUpdateDebugInfo() {
     // デバッグ情報全体が非表示でないことを確認
     if (elem.debugInfo && elem.debugInfo.parentElement.style.display !== 'none') {
@@ -739,10 +713,11 @@ function updateDebugDisplay() {
     const rateText = `総レート: ${currentUpdateRate.toFixed(0)} Hz | RMCレート: ${currentRmcUpdateRate.toFixed(0)} Hz | GGAレート: ${currentGgaUpdateRate.toFixed(0)} Hz`;
     const rmcStatusText = `RMC Status: ${latestRmcStatus}`;
     const ggaStatusText = `GGA Status: ${latestGgaStatus}`;
-    const latLonText = `<span id="decLatLonDisplay">DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}</span>`;  
+    const latLonText = `<span id="decLatLonDisplay">DEC: ${currentLat.toFixed(6)} / ${currentLon.toFixed(6)}</span>`;    
     const rmcRawText = `RMC RAW DMM: ${latestRmcRawLatLon}`;
+    // lastPosition.speedを参照するように修正
     const speedText = `速度: ${(lastPosition && lastPosition.speed !== null) ? lastPosition.speed.toFixed(2) : 'N/A'} m/s`;
-    const lapCountText = `周回数: ${lapCount}`;  
+    const lapCountText = `周回数: ${lapCount}`;    
     
     // 💡 追加するデバッグ情報
     const distanceText = `距離: ${latestDistance.toFixed(2)} m`;
@@ -763,40 +738,41 @@ function updateDebugDisplay() {
     const statusColor = (latestRmcStatus === 'A' || latestGgaStatus.startsWith('FIX')) ? 'lime' : 'white';
     elem.debugInfo.style.color = statusColor;
     
-    realTimeUpdateDebugInfo();
+    // リアルタイム表示の更新は parseNmeaLine で呼び出される realTimeUpdateDebugInfo() に任せる
+    // realTimeUpdateDebugInfo();
 }
 
 // WebUSBデータ読み取りループ
 async function readLoop() {
-    const nmeaLogElement = elem.nmeaLog; 
+    const nmeaLogElement = elem.nmeaLog;    
     
     while (device && keepReading) {
         try {
-            const result = await device.transferIn(IN_ENDPOINT, 512);  
+            const result = await device.transferIn(IN_ENDPOINT, 512);    
             if (result.status === 'ok' && result.data) {
                 const decoder = new TextDecoder('iso-8859-1');
                 const nmeaData = decoder.decode(result.data);
                 
-                updateCounter++;
+                // updateCounter++; // parseNmeaLine内のGGAでカウント
 
                 if (nmeaLogElement && nmeaData.length > 0) {
                     // NMEAログ表示が非表示
                     if (nmeaLogElement.style.display !== 'none') {
                         const lines = nmeaData.trim().split('\n');
                         if (lines.length > 0) {
-                            const latestLine = lines[lines.length - 1].trim();  
-                            nmeaLogElement.textContent = latestLine;  
+                            const latestLine = lines[lines.length - 1].trim();    
+                            nmeaLogElement.textContent = latestLine;    
                         }
                     }
                 }
                 
-                processNmeaData(nmeaData);  
+                processNmeaData(nmeaData);    
             }
         } catch (error) {
             if (keepReading) {
                 if (elem.debugInfo) elem.debugInfo.innerHTML = `USB読み取りエラー: ${error.message}`;
             }
-            break;  
+            break;    
         }
     }
 }
@@ -805,7 +781,7 @@ async function readLoop() {
 async function startWebUsbGps() {
     try {
         if (elem.statusDisplay) elem.statusDisplay.textContent = 'USBデバイスを検索中...';
-        elem.gpsButton.textContent = '接続中...';  
+        elem.gpsButton.textContent = '接続中...';    
 
         device = await navigator.usb.requestDevice({
             filters: [{ vendorId: NMEA_VENDOR_ID, productId: NMEA_PRODUCT_ID }]
@@ -826,8 +802,8 @@ async function startWebUsbGps() {
         isGpsRunning = true;
         keepReading = true;
         
-        startRateMeasurement();  
-        readLoop();  
+        startRateMeasurement();    
+        readLoop();    
         
     } catch (error) {
         if (elem.debugInfo) elem.debugInfo.innerHTML = `USB接続エラー: ${error.message}`;
@@ -846,7 +822,7 @@ function startGps() {
 
 // GPS監視を停止する
 async function stopGps() {
-    stopRateMeasurement();  
+    stopRateMeasurement();    
 
     keepReading = false;
     if (device) {
@@ -871,6 +847,7 @@ async function stopGps() {
     latestRmcRawLatLon = 'N/A';
     latestGgaStatus = 'N/A';
     latestGgaRawLatLon = 'N/A';
+    latestGgaFixQuality = 0; // <--- ADDED reset
     lastPosition = null;
     
     // 💡 停止時にデバッグ情報をリセット
@@ -943,12 +920,12 @@ function onWebUsbPositionUpdate(position) {
     // ヘルパー関数群ここまで
 
     if (!lastPosition) {
-        lastPosition = { 
-            lat: currentLat, 
-            lon: currentLon, 
-            time: currentTime, 
-            speed: position.coords.speed || 0 
-        }; 
+        lastPosition = {    
+            lat: currentLat,    
+            lon: currentLon,    
+            time: currentTime,    
+            speed: position.coords.speed || 0    
+        };    
         previousSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
         
         // 💡 初期値設定
@@ -959,6 +936,13 @@ function onWebUsbPositionUpdate(position) {
         
         return;
     }
+
+    // lastPositionの更新は、ラップ計測ロジックの最後に移動し、GGAまたはRMCによって最新の速度が既にlastPosition.speedに入っていることを前提とする
+    // lastPositionの緯度/経度/時刻を一時的に変数に保存
+    const P1_lat = lastPosition.lat;
+    const P1_lon = lastPosition.lon;
+    const P1_time = lastPosition.time;
+
 
     const currentSideOfLine = getSideOfLine(currentLat, currentLon, LAP_LINE_P1.lat, LAP_LINE_P1.lon, LAP_LINE_P2.lat, LAP_LINE_P2.lon);
     const isCrossingLine = (previousSideOfLine > 0 && currentSideOfLine < 0) || (previousSideOfLine < 0 && currentSideOfLine > 0);
@@ -978,15 +962,15 @@ function onWebUsbPositionUpdate(position) {
     if (isCrossingLine && isCoolDownOver && isNearStartLine) {
         
         // 速度に依存しない、純粋な直線補間用の位置データ
-        const P1_for_Intersection = { 
-            lat: lastPosition.lat, 
-            lon: lastPosition.lon, 
-            time: lastPosition.time 
+        const P1_for_Intersection = {    
+            lat: P1_lat,    
+            lon: P1_lon,    
+            time: P1_time    
         };
-        const P2_for_Intersection = { 
-            lat: currentLat, 
-            lon: currentLon, 
-            time: currentTime 
+        const P2_for_Intersection = {    
+            lat: currentLat,    
+            lon: currentLon,    
+            time: currentTime    
         };
 
         // P1とP2を結ぶ線分と、スタートラインの交差時刻を推定
@@ -1018,38 +1002,31 @@ function onWebUsbPositionUpdate(position) {
             lapFixedDisplayTimeoutId = setTimeout(() => {
                 // RUN状態であれば次のラップのリアルタイム計測を開始
                 if (swState === SW_STATE.RUN) {
-                    startRealtimeLap(); 
+                    startRealtimeLap();    
                 }
-            }, 2000); 
+            }, 2000);    
 
-            // ラップ後の位置情報を更新
+            // ラップ後の位置情報を更新 (lastPosition.speedはRMC処理で既に更新されている)
             previousSideOfLine = currentSideOfLine;
-            lastPosition = {
-                lat: currentLat,
-                lon: currentLon,
-                time: currentTime,
-                speed: position.coords.speed || 0
-            };
+            lastPosition.lat = currentLat;
+            lastPosition.lon = currentLon;
+            lastPosition.time = currentTime;
             
         } else {
-            // 交差時刻が計算できなかった場合（稀なケース）、現在のサイドを更新して次のデータへ
+            // 交差時刻が計算できなかった場合（稀なケース）、現在のサイドと位置情報を更新
             previousSideOfLine = currentSideOfLine;
-            lastPosition = {
-                lat: currentLat,
-                lon: currentLon,
-                time: currentTime,
-                speed: position.coords.speed || 0
-            };
+            lastPosition.lat = currentLat;
+            lastPosition.lon = currentLon;
+            lastPosition.time = currentTime;
+            // lastPosition.speedはRMC処理で更新済み
         }
     } else {
-        // ラインを横切らなかった、またはクールダウン期間中の場合
+        // ラインを横切らなかった、またはクールダウン期間中の場合、位置情報を更新
         previousSideOfLine = currentSideOfLine;
-        lastPosition = {
-            lat: currentLat,
-            lon: currentLon,
-            time: currentTime,
-            speed: position.coords.speed || 0
-        };
+        lastPosition.lat = currentLat;
+        lastPosition.lon = currentLon;
+        lastPosition.time = currentTime;
+        // lastPosition.speedはRMC処理で更新済み
     }
     
     // デバッグ情報も常に最新の位置情報に基づいて更新
@@ -1095,3 +1072,4 @@ window.onload = () => {
 </script>
 </body>
 </html>
+
