@@ -1,4 +1,4 @@
-const CACHE_NAME = 'klap-usb';
+const CACHE_NAME = 'klap-usb-ver0';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -52,4 +52,5 @@ self.addEventListener('activate', (event) => {
       );
     })
   );
+
 });
